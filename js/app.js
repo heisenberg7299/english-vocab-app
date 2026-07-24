@@ -2,6 +2,7 @@ import { lookupWord, WordNotFoundError } from "./dictionary.js";
 import { generateMnemonic } from "./mnemonic.js";
 import * as store from "./storage.js";
 import * as srs from "./srs.js";
+import * as quiz from "./quiz.js";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -183,6 +184,7 @@ function viewWordDetail(word) {
 // ---------- Review tab ----------
 let reviewQueue = [];
 let reviewIndex = 0;
+let currentQuestion = null;
 
 function buildReviewQueue() {
   reviewQueue = store.loadWords().filter((w) => srs.isDue(w.srs));
@@ -194,8 +196,14 @@ function renderReview() {
   renderCurrentReviewCard();
 }
 
+function goToNextReviewCard() {
+  reviewIndex += 1;
+  renderCurrentReviewCard();
+}
+
 function renderCurrentReviewCard() {
   const area = $("#review-area");
+  currentQuestion = null;
 
   if (reviewIndex >= reviewQueue.length) {
     area.innerHTML = `
@@ -207,9 +215,78 @@ function renderCurrentReviewCard() {
   }
 
   const w = reviewQueue[reviewIndex];
+  const allWords = store.loadWords();
+
+  if (quiz.isQuizReady(allWords)) {
+    renderQuizCard(w, allWords);
+  } else {
+    renderFlashcardReview(w);
+  }
+}
+
+// GRE-style multiple-choice question (cloze / definition / synonym)
+function renderQuizCard(w, allWords) {
+  const area = $("#review-area");
+  currentQuestion = { ...quiz.buildQuestion(w, allWords), answered: false };
+  const q = currentQuestion;
+  const longOptions = q.type === "definition";
+
   area.innerHTML = `
     <div class="review-card">
       <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length}</div>
+      ${q.sentence ? `<div class="cloze-sentence">${escapeHtml(q.sentence)}</div>` : ""}
+      <div class="quiz-prompt">${escapeHtml(q.prompt)}</div>
+      <div class="quiz-options ${longOptions ? "quiz-options-long" : ""}">
+        ${q.options
+          .map(
+            (opt, i) =>
+              `<button class="quiz-option" data-action="answer" data-index="${i}">${escapeHtml(opt)}</button>`
+          )
+          .join("")}
+      </div>
+      <div id="quiz-feedback"></div>
+    </div>`;
+}
+
+function handleQuizAnswer(index) {
+  if (!currentQuestion || currentQuestion.answered) return;
+  currentQuestion.answered = true;
+
+  const chosen = currentQuestion.options[index];
+  const correct = chosen === currentQuestion.correctAnswer;
+
+  $$(".quiz-option").forEach((btn, i) => {
+    btn.disabled = true;
+    if (currentQuestion.options[i] === currentQuestion.correctAnswer) {
+      btn.classList.add("correct");
+    } else if (i === index) {
+      btn.classList.add("wrong");
+    }
+  });
+
+  const w = reviewQueue[reviewIndex];
+  const quality = correct ? 5 : 2;
+  const updated = { ...w, srs: srs.review(w.srs, quality) };
+  store.upsertWord(updated);
+  store.recordReviewToday();
+  updateDueBadge();
+
+  $("#quiz-feedback").innerHTML = `
+    <div class="quiz-result ${correct ? "quiz-correct" : "quiz-wrong"}">
+      ${correct ? "✅ 答對了！" : `❌ 答錯了，正確答案：${escapeHtml(currentQuestion.correctAnswer)}`}
+    </div>
+    ${renderWordCard(updated, { showAddButton: false })}
+    <button class="reveal-btn" data-action="next-question">下一題</button>`;
+}
+
+// Simple flashcard self-grading fallback (used until you've saved at least
+// 4 words, since the quiz modes need other words to build wrong answers from)
+function renderFlashcardReview(w) {
+  const area = $("#review-area");
+  area.innerHTML = `
+    <div class="review-card">
+      <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length}</div>
+      <p class="status">再收藏 ${Math.max(0, 4 - store.loadWords().length)} 個單字即可解鎖選擇題複習模式</p>
       <div class="review-word">${escapeHtml(w.word)}</div>
       <div class="phonetic">${escapeHtml(w.phonetic || "")}</div>
       <button class="reveal-btn" data-action="reveal">看看你記得嗎？</button>
@@ -235,9 +312,7 @@ function gradeCurrentWord(quality) {
   const updated = { ...w, srs: srs.review(w.srs, quality) };
   store.upsertWord(updated);
   store.recordReviewToday();
-  reviewIndex += 1;
-  updateDueBadge();
-  renderCurrentReviewCard();
+  goToNextReviewCard();
 }
 
 // ---------- Stats tab ----------
@@ -303,6 +378,8 @@ function initGlobalEvents() {
       audio.play().catch(() => {});
     }
     if (action === "grade") gradeCurrentWord(Number(target.dataset.grade));
+    if (action === "answer") handleQuizAnswer(Number(target.dataset.index));
+    if (action === "next-question") goToNextReviewCard();
   });
 
   $("#list-filter").addEventListener("input", renderWordList);
