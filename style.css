@@ -444,13 +444,26 @@ body {
 }
 .review-progress { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
 .review-card h3 { margin-top: 0; font-size: 18px; }
-.preview-words {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
+.preview-word-list {
+  text-align: left;
   margin: 16px 0 24px;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
+.preview-word-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.preview-word-item:last-child { border-bottom: none; }
+.preview-word-text { font-weight: 700; font-size: 15px; min-width: 90px; }
+.preview-word-zh { color: var(--text); }
 .review-word { font-size: 32px; font-weight: 700; margin: 10px 0; }
 .review-answer { text-align: left; margin-top: 18px; border-top: 1px solid var(--border); padding-top: 16px; }
 .retention-badge {

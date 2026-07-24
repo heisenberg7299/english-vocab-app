@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=14";
-import { generateMnemonic } from "./mnemonic.js?v=14";
-import { translateToChinese } from "./translate.js?v=14";
-import * as store from "./storage.js?v=14";
-import * as srs from "./srs.js?v=14";
-import * as quiz from "./quiz.js?v=14";
-import * as cloud from "./cloud-sync.js?v=14";
+} from "./dictionary.js?v=15";
+import { generateMnemonic } from "./mnemonic.js?v=15";
+import { translateToChinese } from "./translate.js?v=15";
+import * as store from "./storage.js?v=15";
+import * as srs from "./srs.js?v=15";
+import * as quiz from "./quiz.js?v=15";
+import * as cloud from "./cloud-sync.js?v=15";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -663,8 +663,18 @@ function renderReviewPreview() {
       <p class="status">
         ${weekly ? "這禮拜複習過的" : "今天會複習這"} ${reviewQueue.length} 個單字：
       </p>
-      <div class="preview-words">
-        ${reviewQueue.map((w) => `<span class="tag">${escapeHtml(w.word)}</span>`).join("")}
+      <div class="preview-word-list">
+        ${reviewQueue
+          .map((w) => {
+            const pos = w.meanings?.[0]?.partOfSpeech || "";
+            return `
+              <div class="preview-word-item">
+                <span class="preview-word-text">${escapeHtml(w.word)}</span>
+                ${pos ? `<span class="pos-label">詞性：${escapeHtml(pos)}</span>` : ""}
+                <span class="preview-word-zh">${escapeHtml(w.chineseMeaning || "（尚無中文翻譯）")}</span>
+              </div>`;
+          })
+          .join("")}
       </div>
       <button class="reveal-btn" data-action="start-review">開始複習</button>
     </div>`;
