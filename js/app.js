@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=10";
-import { generateMnemonic } from "./mnemonic.js?v=10";
-import { translateToChinese } from "./translate.js?v=10";
-import * as store from "./storage.js?v=10";
-import * as srs from "./srs.js?v=10";
-import * as quiz from "./quiz.js?v=10";
-import * as cloud from "./cloud-sync.js?v=10";
+} from "./dictionary.js?v=11";
+import { generateMnemonic } from "./mnemonic.js?v=11";
+import { translateToChinese } from "./translate.js?v=11";
+import * as store from "./storage.js?v=11";
+import * as srs from "./srs.js?v=11";
+import * as quiz from "./quiz.js?v=11";
+import * as cloud from "./cloud-sync.js?v=11";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -35,11 +35,16 @@ function switchTab(name) {
 }
 
 // Re-renders whichever tab is currently visible — used when data changes
-// underneath the UI (a Firestore snapshot arriving from another device).
+// underneath the UI (a Firestore snapshot arriving from another device, or
+// just the echo of a write this same tab made). Deliberately excludes
+// review/flashcards: both hold local, in-progress state (the current
+// question, its answered/flipped status) that a snapshot firing mid-answer
+// would otherwise wipe out — every graded review writes to Firestore, and
+// that write's own echo was resetting the review tab back to word #1 before
+// the user could even see whether they got it right. Switching into those
+// tabs already re-syncs via buildReviewQueue()/renderFlashcards().
 function refreshCurrentTab() {
   if (activeTab === "list") renderWordList();
-  if (activeTab === "review") renderReview();
-  if (activeTab === "flashcards") renderFlashcards();
   if (activeTab === "stats") renderStats();
   updateDueBadge();
 }
