@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=2";
-import { generateMnemonic } from "./mnemonic.js?v=2";
-import { translateToChinese } from "./translate.js?v=2";
-import * as store from "./storage.js?v=2";
-import * as srs from "./srs.js?v=2";
-import * as quiz from "./quiz.js?v=2";
-import * as cloud from "./cloud-sync.js?v=2";
+} from "./dictionary.js?v=3";
+import { generateMnemonic } from "./mnemonic.js?v=3";
+import { translateToChinese } from "./translate.js?v=3";
+import * as store from "./storage.js?v=3";
+import * as srs from "./srs.js?v=3";
+import * as quiz from "./quiz.js?v=3";
+import * as cloud from "./cloud-sync.js?v=3";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -489,11 +489,19 @@ let reviewIndex = 0;
 let currentQuestion = null;
 
 // Caps today's review to DAILY_REVIEW_LIMIT words, even if more are overdue,
-// so a backlog doesn't dump 50 cards on you at once. Which words count as
-// "today's batch" is pinned to a date-stamped list in localStorage, so
+// so a backlog doesn't dump 50 cards on you at once. When there's a
+// backlog, the words most overdue / most often gotten wrong (srs.priorityScore)
+// fill the limited slots first instead of whichever was added first — no
+// real GRE/IELTS frequency data exists to rank against, so "needs more
+// review" is judged from your own performance instead. Which words count
+// as "today's batch" is pinned to a date-stamped list in localStorage, so
 // re-opening the tab doesn't hand out a fresh 15 on top of ones already
 // reviewed — anything past the cap just waits and surfaces again tomorrow.
 function getTodayReviewQueue(dueWords) {
+  const byPriority = [...dueWords].sort(
+    (a, b) => srs.priorityScore(b.srs) - srs.priorityScore(a.srs)
+  );
+
   const today = new Date().toISOString().slice(0, 10);
   let session;
   try {
@@ -503,12 +511,12 @@ function getTodayReviewQueue(dueWords) {
   }
 
   if (!session || session.date !== today) {
-    session = { date: today, words: dueWords.slice(0, DAILY_REVIEW_LIMIT).map((w) => w.word) };
+    session = { date: today, words: byPriority.slice(0, DAILY_REVIEW_LIMIT).map((w) => w.word) };
     localStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(session));
   }
 
   const sessionWords = new Set(session.words);
-  return dueWords.filter((w) => sessionWords.has(w.word));
+  return byPriority.filter((w) => sessionWords.has(w.word));
 }
 
 function buildReviewQueue() {

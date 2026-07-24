@@ -61,6 +61,19 @@ export function daysUntilDue(card) {
   return Math.round((due - today) / 86400000);
 }
 
+// Priority score for picking which due words fill today's capped review
+// slots — higher = more urgent. Combines how overdue a card is with how
+// much the learner has struggled with it (low ease factor, past lapses),
+// so when there's a backlog, the words most at risk of being forgotten get
+// one of the limited slots instead of whichever was added first.
+export function priorityScore(card) {
+  if (!card) return 0;
+  const overdueDays = Math.max(0, -daysUntilDue(card));
+  const difficulty = Math.max(0, 2.5 - (card.easeFactor ?? 2.5)) * 3;
+  const lapses = (card.reviewHistory || []).filter((h) => h.quality < 3).length;
+  return overdueDays + difficulty + lapses * 2;
+}
+
 // Forecast how many cards become due over the next `days` days (for stats view)
 export function forecast(words, days = 7) {
   const buckets = Array.from({ length: days }, () => 0);
