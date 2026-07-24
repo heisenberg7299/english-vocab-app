@@ -9,7 +9,24 @@
 <body>
 <div class="app">
   <header class="topbar">
-    <h1>📘 單字背起來</h1>
+    <div class="topbar-row">
+      <h1>📘 單字背起來</h1>
+      <div id="auth-area" class="auth-area">
+        <button id="auth-toggle-btn" type="button" class="auth-btn">🔒 登入以同步</button>
+      </div>
+    </div>
+
+    <div id="auth-panel" class="auth-panel hidden">
+      <p class="import-hint">登入後單字本會同步到雲端，不同裝置登入同一個帳號就能看到同一份資料。</p>
+      <input id="auth-email" type="email" placeholder="Email" autocomplete="email" />
+      <input id="auth-password" type="password" placeholder="密碼（至少 6 碼）" autocomplete="current-password" />
+      <div class="auth-actions">
+        <button id="auth-login-btn" type="button" class="primary">登入</button>
+        <button id="auth-signup-btn" type="button">註冊新帳號</button>
+      </div>
+      <div id="auth-status" class="status"></div>
+    </div>
+
     <nav class="tabs">
       <button class="tab-btn active" data-tab="search">查單字</button>
       <button class="tab-btn" data-tab="list">我的單字本</button>

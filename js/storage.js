@@ -1,70 +1,93 @@
-// localStorage persistence for the vocabulary list
+// Local-first persistence for the vocabulary list. Always reads/writes an
+// in-memory cache mirrored to localStorage, so callers stay synchronous.
+// cloud-sync.js observes writes via onWrite() to mirror them to Firestore,
+// and pushes remote changes back in via replaceWords()/replaceStats().
 const STORAGE_KEY = "vocab_words_v1";
 const STATS_KEY = "vocab_stats_v1";
 
-export function loadWords() {
+function readLocal(key, fallback) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
   } catch {
-    return [];
+    return fallback;
   }
 }
 
-export function saveWords(words) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+let wordsCache = readLocal(STORAGE_KEY, []);
+let statsCache = readLocal(STATS_KEY, { reviewedDates: [] });
+
+const writeListeners = [];
+export function onWrite(fn) {
+  writeListeners.push(fn);
+  return () => {
+    const i = writeListeners.indexOf(fn);
+    if (i >= 0) writeListeners.splice(i, 1);
+  };
+}
+function emit(type, payload) {
+  writeListeners.forEach((fn) => fn(type, payload));
 }
 
-export function upsertWord(word) {
-  const words = loadWords();
-  const idx = words.findIndex(
+export function loadWords() {
+  return wordsCache;
+}
+
+export function upsertWord(word, opts = {}) {
+  const idx = wordsCache.findIndex(
     (w) => w.word.toLowerCase() === word.word.toLowerCase()
   );
   if (idx >= 0) {
-    words[idx] = { ...words[idx], ...word };
+    wordsCache[idx] = { ...wordsCache[idx], ...word };
   } else {
-    words.push(word);
+    wordsCache.push(word);
   }
-  saveWords(words);
-  return words;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(wordsCache));
+  if (!opts.fromRemote) emit("upsertWord", wordsCache[idx >= 0 ? idx : wordsCache.length - 1]);
+  return wordsCache;
 }
 
-export function deleteWord(word) {
-  const words = loadWords().filter(
+export function deleteWord(word, opts = {}) {
+  wordsCache = wordsCache.filter(
     (w) => w.word.toLowerCase() !== word.toLowerCase()
   );
-  saveWords(words);
-  return words;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(wordsCache));
+  if (!opts.fromRemote) emit("deleteWord", word);
+  return wordsCache;
+}
+
+// Used by cloud-sync.js when a Firestore snapshot arrives — replaces the
+// whole cache without re-emitting (that would just echo back to Firestore).
+export function replaceWords(words) {
+  wordsCache = words;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(wordsCache));
 }
 
 export function getWord(word) {
-  return loadWords().find(
-    (w) => w.word.toLowerCase() === word.toLowerCase()
-  );
+  return wordsCache.find((w) => w.word.toLowerCase() === word.toLowerCase());
 }
 
 export function loadStats() {
-  try {
-    const raw = localStorage.getItem(STATS_KEY);
-    return raw ? JSON.parse(raw) : { reviewedDates: [] };
-  } catch {
-    return { reviewedDates: [] };
-  }
+  return statsCache;
 }
 
-export function recordReviewToday() {
-  const stats = loadStats();
+export function replaceStats(stats) {
+  statsCache = stats;
+  localStorage.setItem(STATS_KEY, JSON.stringify(statsCache));
+}
+
+export function recordReviewToday(opts = {}) {
   const today = new Date().toISOString().slice(0, 10);
-  if (!stats.reviewedDates.includes(today)) {
-    stats.reviewedDates.push(today);
+  if (!statsCache.reviewedDates.includes(today)) {
+    statsCache = { ...statsCache, reviewedDates: [...statsCache.reviewedDates, today] };
   }
-  localStorage.setItem(STATS_KEY, JSON.stringify(stats));
-  return stats;
+  localStorage.setItem(STATS_KEY, JSON.stringify(statsCache));
+  if (!opts.fromRemote) emit("recordReviewToday", statsCache);
+  return statsCache;
 }
 
 export function getStreak() {
-  const stats = loadStats();
-  const dates = new Set(stats.reviewedDates);
+  const dates = new Set(statsCache.reviewedDates);
   let streak = 0;
   let cursor = new Date();
   // if today not yet reviewed, start checking from yesterday so streak doesn't

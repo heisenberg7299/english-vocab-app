@@ -10,11 +10,14 @@ import { translateToChinese } from "./translate.js";
 import * as store from "./storage.js";
 import * as srs from "./srs.js";
 import * as quiz from "./quiz.js";
+import * as cloud from "./cloud-sync.js";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 
 // ---------- Tabs ----------
+let activeTab = "search";
+
 function initTabs() {
   $$(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
@@ -22,11 +25,21 @@ function initTabs() {
 }
 
 function switchTab(name) {
+  activeTab = name;
   $$(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   $$(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${name}`));
   if (name === "list") renderWordList();
   if (name === "review") renderReview();
   if (name === "stats") renderStats();
+}
+
+// Re-renders whichever tab is currently visible — used when data changes
+// underneath the UI (a Firestore snapshot arriving from another device).
+function refreshCurrentTab() {
+  if (activeTab === "list") renderWordList();
+  if (activeTab === "review") renderReview();
+  if (activeTab === "stats") renderStats();
+  updateDueBadge();
 }
 
 // ---------- Rendering helpers ----------
@@ -674,14 +687,91 @@ function initGlobalEvents() {
     if (action === "save-manual") saveManualWord(target.dataset.word);
     if (action === "manual-entry-jump") jumpToManualEntry(target.dataset.word);
     if (action === "translate") translateWord(target.dataset.word);
+    if (action === "logout") cloud.logOut();
   });
 
   $("#list-filter").addEventListener("input", renderWordList);
+}
+
+// ---------- Auth / cloud sync ----------
+function initAuth() {
+  $("#auth-toggle-btn").addEventListener("click", () => {
+    $("#auth-panel").classList.toggle("hidden");
+  });
+
+  $("#auth-login-btn").addEventListener("click", () => submitAuth("login"));
+  $("#auth-signup-btn").addEventListener("click", () => submitAuth("signup"));
+
+  cloud.onAuthChange(async (user) => {
+    renderAuthArea(user);
+    if (user) {
+      await cloud.startSync(user.uid);
+    } else {
+      cloud.stopSync();
+    }
+    refreshCurrentTab();
+  });
+
+  cloud.onRemoteChange(refreshCurrentTab);
+}
+
+async function submitAuth(mode) {
+  const email = $("#auth-email").value.trim();
+  const password = $("#auth-password").value;
+  const status = $("#auth-status");
+
+  if (!email || !password) {
+    status.textContent = "請輸入 Email 和密碼";
+    status.classList.add("error");
+    return;
+  }
+
+  status.textContent = mode === "signup" ? "註冊中..." : "登入中...";
+  status.classList.remove("error");
+
+  try {
+    if (mode === "signup") {
+      await cloud.signUp(email, password);
+    } else {
+      await cloud.logIn(email, password);
+    }
+    status.textContent = "";
+    $("#auth-password").value = "";
+    $("#auth-panel").classList.add("hidden");
+  } catch (err) {
+    status.textContent = authErrorMessage(err);
+    status.classList.add("error");
+  }
+}
+
+function authErrorMessage(err) {
+  const code = err?.code || "";
+  if (code.includes("email-already-in-use")) return "這個 Email 已經註冊過了，改用登入";
+  if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Email 或密碼不對";
+  if (code.includes("weak-password")) return "密碼至少要 6 碼";
+  if (code.includes("invalid-email")) return "Email 格式不對";
+  if (code.includes("user-not-found")) return "找不到這個帳號，改用註冊";
+  return "發生錯誤，請再試一次";
+}
+
+function renderAuthArea(user) {
+  const area = $("#auth-area");
+  if (user) {
+    area.innerHTML = `
+      <span class="auth-btn">☁️ ${escapeHtml(user.email)}</span>
+      <button id="auth-logout-btn" type="button" class="auth-btn" data-action="logout">登出</button>`;
+  } else {
+    area.innerHTML = `<button id="auth-toggle-btn" type="button" class="auth-btn">🔒 登入以同步</button>`;
+    $("#auth-toggle-btn").addEventListener("click", () => {
+      $("#auth-panel").classList.toggle("hidden");
+    });
+  }
 }
 
 // ---------- Init ----------
 initTabs();
 initSearch();
 initImport();
+initAuth();
 initGlobalEvents();
 updateDueBadge();
