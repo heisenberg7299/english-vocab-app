@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>單字背起來 · 英文單字學習</title>
-<link rel="stylesheet" href="style.css?v=13" />
+<link rel="stylesheet" href="style.css?v=14" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#2563eb" />
 <link rel="icon" href="icons/icon-192.png" />
@@ -17,6 +17,7 @@
 <div class="app">
   <header class="topbar">
     <div class="topbar-row">
+      <button id="menu-toggle-btn" type="button" class="menu-toggle-btn" aria-label="選單">☰</button>
       <h1>📘 單字背起來</h1>
       <div id="auth-area" class="auth-area">
         <button id="auth-toggle-btn" type="button" class="auth-btn">🔒 登入以同步</button>
@@ -34,13 +35,14 @@
       <div id="auth-status" class="status"></div>
     </div>
 
-    <nav class="tabs">
+    <nav class="tabs" id="tabs-menu">
       <button class="tab-btn active" data-tab="search">查單字</button>
       <button class="tab-btn" data-tab="list">我的單字本</button>
       <button class="tab-btn" data-tab="review">
         今日複習 <span id="due-badge" class="badge hidden">0</span>
       </button>
       <button class="tab-btn" data-tab="flashcards">字卡</button>
+      <button class="tab-btn" data-tab="calendar">📅 日曆</button>
       <button class="tab-btn" data-tab="stats">統計</button>
     </nav>
   </header>
@@ -96,6 +98,11 @@
       <div id="flashcard-area"></div>
     </section>
 
+    <!-- 日曆 -->
+    <section id="tab-calendar" class="tab-panel">
+      <div id="calendar-area"></div>
+    </section>
+
     <!-- 統計 -->
     <section id="tab-stats" class="tab-panel">
       <div id="stats-area" class="stats-grid"></div>
@@ -103,7 +110,7 @@
   </main>
 </div>
 
-<script type="module" src="js/app.js?v=13"></script>
+<script type="module" src="js/app.js?v=14"></script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));

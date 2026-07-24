@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=13";
-import { generateMnemonic } from "./mnemonic.js?v=13";
-import { translateToChinese } from "./translate.js?v=13";
-import * as store from "./storage.js?v=13";
-import * as srs from "./srs.js?v=13";
-import * as quiz from "./quiz.js?v=13";
-import * as cloud from "./cloud-sync.js?v=13";
+} from "./dictionary.js?v=14";
+import { generateMnemonic } from "./mnemonic.js?v=14";
+import { translateToChinese } from "./translate.js?v=14";
+import * as store from "./storage.js?v=14";
+import * as srs from "./srs.js?v=14";
+import * as quiz from "./quiz.js?v=14";
+import * as cloud from "./cloud-sync.js?v=14";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -20,7 +20,14 @@ let activeTab = "search";
 
 function initTabs() {
   $$(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    btn.addEventListener("click", () => {
+      switchTab(btn.dataset.tab);
+      $("#tabs-menu").classList.remove("open");
+    });
+  });
+
+  $("#menu-toggle-btn").addEventListener("click", () => {
+    $("#tabs-menu").classList.toggle("open");
   });
 }
 
@@ -31,6 +38,7 @@ function switchTab(name) {
   if (name === "list") renderWordList();
   if (name === "review") renderReview();
   if (name === "flashcards") renderFlashcards();
+  if (name === "calendar") renderCalendar();
   if (name === "stats") renderStats();
 }
 
@@ -46,6 +54,7 @@ function switchTab(name) {
 function refreshCurrentTab() {
   if (activeTab === "list") renderWordList();
   if (activeTab === "stats") renderStats();
+  if (activeTab === "calendar") renderCalendar();
   // Self-heal from the "tab opened before Firestore's initial sync landed"
   // race — but only when there's nothing in progress yet, so this can't
   // clobber an active question/flipped card like the bug above did.
@@ -879,6 +888,96 @@ function goToFlashcard(delta) {
   drawRandomFlashcard();
 }
 
+// ---------- Calendar tab ----------
+// A month view of learning history: which days had a review session, how
+// many words got added, and how many review events happened, so the whole
+// journey is visible at a glance instead of just a streak number.
+let calendarViewDate = new Date();
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function renderCalendar() {
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth();
+  const words = store.loadWords();
+  const reviewedDates = new Set(store.loadStats().reviewedDates || []);
+
+  const addedByDate = new Map();
+  const reviewCountByDate = new Map();
+  for (const w of words) {
+    if (w.addedDate) addedByDate.set(w.addedDate, (addedByDate.get(w.addedDate) || 0) + 1);
+    for (const h of w.srs?.reviewHistory || []) {
+      reviewCountByDate.set(h.date, (reviewCountByDate.get(h.date) || 0) + 1);
+    }
+  }
+
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dateStr = (d) => `${year}-${pad2(month + 1)}-${pad2(d)}`;
+
+  const cells = Array.from({ length: firstWeekday }, () => null).concat(
+    Array.from({ length: daysInMonth }, (_, i) => i + 1)
+  );
+
+  const cellsHtml = cells
+    .map((d) => {
+      if (!d) return `<div class="cal-cell cal-empty"></div>`;
+      const ds = dateStr(d);
+      const reviewCount = reviewCountByDate.get(ds) || 0;
+      const addedCount = addedByDate.get(ds) || 0;
+      return `
+        <button type="button" class="cal-cell ${ds === todayStr ? "cal-today" : ""} ${reviewedDates.has(ds) ? "cal-reviewed" : ""}" data-action="view-cal-day" data-date="${ds}">
+          <span class="cal-day-num">${d}</span>
+          ${addedCount ? `<span class="cal-badge cal-added">+${addedCount}</span>` : ""}
+          ${reviewCount ? `<span class="cal-badge cal-review-count">✓${reviewCount}</span>` : ""}
+        </button>`;
+    })
+    .join("");
+
+  $("#calendar-area").innerHTML = `
+    <div class="cal-header">
+      <button type="button" data-action="cal-prev-month">←</button>
+      <h3>${year} 年 ${month + 1} 月</h3>
+      <button type="button" data-action="cal-next-month">→</button>
+    </div>
+    <div class="cal-weekdays">${["日", "一", "二", "三", "四", "五", "六"].map((d) => `<div>${d}</div>`).join("")}</div>
+    <div class="cal-grid">${cellsHtml}</div>
+    <div class="cal-legend">
+      <span class="cal-legend-item"><span class="cal-dot"></span>有複習</span>
+      <span class="cal-legend-item"><span class="cal-badge cal-added">+N</span>新增單字</span>
+      <span class="cal-legend-item"><span class="cal-badge cal-review-count">✓N</span>複習次數</span>
+    </div>
+    <div id="cal-day-detail"></div>`;
+}
+
+function changeCalendarMonth(delta) {
+  calendarViewDate.setMonth(calendarViewDate.getMonth() + delta);
+  renderCalendar();
+}
+
+function viewCalendarDay(dateStr) {
+  const words = store.loadWords();
+  const added = words.filter((w) => w.addedDate === dateStr).map((w) => w.word);
+  const reviewed = words
+    .filter((w) => (w.srs?.reviewHistory || []).some((h) => h.date === dateStr))
+    .map((w) => w.word);
+
+  const detail = $("#cal-day-detail");
+  if (!added.length && !reviewed.length) {
+    detail.innerHTML = `<p class="status">${dateStr}：這天沒有記錄</p>`;
+    return;
+  }
+  detail.innerHTML = `
+    <div class="cal-detail-card">
+      <h4>${dateStr}</h4>
+      ${added.length ? `<p><strong>新增單字：</strong>${added.map((w) => escapeHtml(w)).join("、")}</p>` : ""}
+      ${reviewed.length ? `<p><strong>複習過：</strong>${reviewed.map((w) => escapeHtml(w)).join("、")}</p>` : ""}
+    </div>`;
+}
+
 // ---------- Stats tab ----------
 function renderStats() {
   const words = store.loadWords();
@@ -928,6 +1027,9 @@ function initGlobalEvents() {
     if (action === "answer") handleQuizAnswer(Number(target.dataset.index));
     if (action === "next-question") goToNextReviewCard();
     if (action === "start-review") startReviewSession();
+    if (action === "cal-prev-month") changeCalendarMonth(-1);
+    if (action === "cal-next-month") changeCalendarMonth(1);
+    if (action === "view-cal-day") viewCalendarDay(target.dataset.date);
     if (action === "search-word") {
       $("#search-input").value = target.dataset.word;
       doSearch(target.dataset.word);
