@@ -100,6 +100,13 @@ body {
   border: none; background: none; cursor: pointer; font-size: 18px;
   color: var(--primary);
 }
+.source-badge {
+  font-size: 11px;
+  color: var(--muted);
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
 
 .pos-block { margin-top: 14px; }
 .pos-label {
@@ -150,6 +157,50 @@ body {
 }
 .actions .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .actions .danger { color: var(--danger); border-color: #fecaca; }
+
+.notfound-card p { margin-top: 0; }
+.suggestion-row { margin: 10px 0; font-size: 14px; }
+.suggestion-row .label { color: var(--muted); margin-right: 6px; }
+.suggestion-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  margin: 3px 4px 3px 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #eef2ff;
+  color: var(--primary-dark);
+  font-size: 13px;
+  cursor: pointer;
+}
+.manual-toggle-btn {
+  margin-top: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.manual-form { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.manual-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.manual-form input,
+.manual-form textarea {
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+}
+.manual-form-actions { display: flex; }
 
 .list-toolbar { margin-bottom: 12px; display: flex; gap: 8px; }
 .list-toolbar input {
@@ -343,4 +394,9 @@ body {
   .quiz-option.wrong { background: #3a1a1a; border-color: #ef4444; color: #fca5a5; }
   .list-toolbar button { background: #1a2233; color: var(--text); }
   .import-panel textarea { background: #0f1420; color: var(--text); border-color: var(--border); }
+  .source-badge { background: #26314a; }
+  .suggestion-chip { background: #1e2a4a; color: #93c5fd; border-color: var(--border); }
+  .manual-toggle-btn { background: #1a2233; color: var(--text); border-color: var(--border); }
+  .manual-form input,
+  .manual-form textarea { background: #0f1420; color: var(--text); border-color: var(--border); }
 }

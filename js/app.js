@@ -1,4 +1,10 @@
-import { lookupWord, WordNotFoundError } from "./dictionary.js";
+import {
+  lookupWord,
+  lookupWordFallback,
+  fetchSimilarWords,
+  buildManualWordData,
+  WordNotFoundError,
+} from "./dictionary.js";
 import { generateMnemonic } from "./mnemonic.js";
 import * as store from "./storage.js";
 import * as srs from "./srs.js";
@@ -66,6 +72,13 @@ function renderWordCard(data, opts = {}) {
     data.meanings[0]?.definitions[0]?.definition || ""
   );
 
+  const sourceLabel =
+    data.source === "datamuse"
+      ? `<span class="source-badge">來源：備援字典（Wiktionary）</span>`
+      : data.source === "manual"
+      ? `<span class="source-badge">來源：自行輸入</span>`
+      : "";
+
   const actionsHtml = showAddButton
     ? saved
       ? `<div class="actions">
@@ -82,6 +95,7 @@ function renderWordCard(data, opts = {}) {
         <h2>${escapeHtml(data.word)}</h2>
         ${data.phonetic ? `<span class="phonetic">${escapeHtml(data.phonetic)}</span>` : ""}
         ${data.audio ? `<button class="audio-btn" data-action="play-audio" data-src="${escapeHtml(data.audio)}">🔊</button>` : ""}
+        ${sourceLabel}
       </div>
       ${meaningsHtml}
       ${synHtml}
@@ -118,13 +132,131 @@ async function doSearch(word) {
     const data = await lookupWord(word);
     lastSearchResult = data;
     status.textContent = "";
-    const saved = !!store.getWord(data.word);
-    result.innerHTML = renderWordCard(data, { saved });
+    renderSearchResult(data);
   } catch (err) {
-    lastSearchResult = null;
-    status.textContent = err instanceof WordNotFoundError ? err.message : err.message || "查詢時發生錯誤";
-    status.classList.add("error");
+    if (err instanceof WordNotFoundError) {
+      await handleWordNotFound(word);
+    } else {
+      lastSearchResult = null;
+      status.textContent = err.message || "查詢時發生錯誤";
+      status.classList.add("error");
+    }
   }
+}
+
+function renderSearchResult(data) {
+  const saved = !!store.getWord(data.word);
+  $("#search-result").innerHTML = renderWordCard(data, { saved });
+}
+
+// Primary dictionary has nothing: try the Datamuse fallback definition, and
+// if that's empty too, offer spelling suggestions plus a manual-entry form.
+async function handleWordNotFound(word) {
+  const status = $("#search-status");
+  status.textContent = "主要字典查無此字，嘗試備援來源...";
+
+  const fallback = await lookupWordFallback(word);
+  if (fallback) {
+    lastSearchResult = fallback;
+    status.textContent = "";
+    renderSearchResult(fallback);
+    return;
+  }
+
+  const clean = word.trim().toLowerCase();
+  lastSearchResult = null;
+  status.textContent = `找不到「${clean}」`;
+  status.classList.add("error");
+
+  const suggestions = await fetchSimilarWords(clean);
+  $("#search-result").innerHTML = renderNotFoundPanel(clean, suggestions);
+}
+
+function renderNotFoundPanel(word, suggestions) {
+  const suggestionsHtml = suggestions.length
+    ? `<div class="suggestion-row">
+         <span class="label">你是不是要找：</span>
+         ${suggestions
+           .map(
+             (s) =>
+               `<button class="suggestion-chip" data-action="search-word" data-word="${escapeHtml(s)}">${escapeHtml(s)}</button>`
+           )
+           .join("")}
+       </div>`
+    : "";
+
+  return `
+    <div class="card notfound-card">
+      <p>兩個字典來源都查不到「${escapeHtml(word)}」。</p>
+      ${suggestionsHtml}
+      <button class="manual-toggle-btn" data-action="manual-entry" data-word="${escapeHtml(word)}">✍️ 自行輸入意思</button>
+      <div id="manual-entry-area"></div>
+    </div>`;
+}
+
+function renderManualEntryForm(word) {
+  const area = $("#manual-entry-area");
+  if (!area) return;
+  area.innerHTML = `
+    <div class="manual-form">
+      <label>詞性（選填）<input id="manual-pos" type="text" placeholder="例如 adj. / n. / v." /></label>
+      <label>意思 / 定義<textarea id="manual-def" rows="2" placeholder="用中文或英文寫下這個字的意思"></textarea></label>
+      <label>例句（選填）<textarea id="manual-example" rows="2" placeholder="例句，選填"></textarea></label>
+      <div class="manual-form-actions">
+        <button class="primary" data-action="save-manual" data-word="${escapeHtml(word)}">加入單字本</button>
+      </div>
+      <div id="manual-form-status" class="status"></div>
+    </div>`;
+}
+
+function saveManualWord(word) {
+  const def = $("#manual-def").value.trim();
+  const statusEl = $("#manual-form-status");
+  if (!def) {
+    statusEl.textContent = "請先輸入意思才能加入";
+    statusEl.classList.add("error");
+    return;
+  }
+
+  const data = buildManualWordData(word, {
+    partOfSpeech: $("#manual-pos").value,
+    definition: def,
+    example: $("#manual-example").value,
+  });
+  const fullData = saveWordRecord(data);
+
+  updateDueBadge();
+  lastSearchResult = fullData;
+  $("#search-status").textContent = "";
+  $("#search-status").classList.remove("error");
+  renderSearchResult(fullData);
+}
+
+// Jump straight to the manual-entry form for a word that failed bulk import
+function jumpToManualEntry(word) {
+  switchTab("search");
+  $("#search-input").value = word;
+  $("#search-status").textContent = `找不到「${word}」`;
+  $("#search-status").classList.add("error");
+  $("#search-result").innerHTML = renderNotFoundPanel(word, []);
+  renderManualEntryForm(word);
+}
+
+// Saves a normalized word record (from the API, the Datamuse fallback, or
+// manual entry) with a fresh mnemonic and SRS card.
+function saveWordRecord(data) {
+  const mnemonic = data.mnemonic || generateMnemonic(
+    data.word,
+    data.meanings[0]?.definitions[0]?.definition || ""
+  );
+  const full = {
+    ...data,
+    mnemonic,
+    addedDate: new Date().toISOString().slice(0, 10),
+    srs: srs.newCard(),
+  };
+  store.upsertWord(full);
+  return full;
 }
 
 function addWordToList(wordKey) {
@@ -133,13 +265,7 @@ function addWordToList(wordKey) {
     : null;
   if (!data) return;
 
-  const mnemonic = generateMnemonic(data.word, data.meanings[0]?.definitions[0]?.definition || "");
-  store.upsertWord({
-    ...data,
-    mnemonic,
-    addedDate: new Date().toISOString().slice(0, 10),
-    srs: srs.newCard(),
-  });
+  saveWordRecord(data);
   updateDueBadge();
   // refresh whichever card is currently displayed
   doSearch(data.word);
@@ -228,20 +354,21 @@ async function runBulkImport() {
     } else {
       try {
         const data = await lookupWord(word);
-        const mnemonic = generateMnemonic(data.word, data.meanings[0]?.definitions[0]?.definition || "");
-        store.upsertWord({
-          ...data,
-          mnemonic,
-          addedDate: new Date().toISOString().slice(0, 10),
-          srs: srs.newCard(),
-        });
+        saveWordRecord(data);
         added.push(data.word);
       } catch {
-        failed.push(word);
+        // primary dictionary doesn't have it — try the fallback before giving up
+        const fallback = await lookupWordFallback(word);
+        if (fallback) {
+          saveWordRecord(fallback);
+          added.push(fallback.word);
+        } else {
+          failed.push(word);
+        }
       }
     }
 
-    // be polite to the free public API
+    // be polite to the free public APIs
     if (i < words.length - 1) await new Promise((r) => setTimeout(r, 200));
   }
 
@@ -251,7 +378,18 @@ async function runBulkImport() {
   resultBox.innerHTML = `
     ${added.length ? `<div class="import-ok">✅ 已加入 ${added.length} 個：${escapeHtml(added.join(", "))}</div>` : ""}
     ${skipped.length ? `<div>⏭️ 已存在，略過 ${skipped.length} 個：${escapeHtml(skipped.join(", "))}</div>` : ""}
-    ${failed.length ? `<div class="import-fail">❌ 查詢失敗 ${failed.length} 個：${escapeHtml(failed.join(", "))}</div>` : ""}`;
+    ${
+      failed.length
+        ? `<div class="import-fail">❌ 兩個字典來源都查不到 ${failed.length} 個：
+            ${failed
+              .map(
+                (w) =>
+                  `<button class="suggestion-chip" data-action="manual-entry-jump" data-word="${escapeHtml(w)}">${escapeHtml(w)} ✍️</button>`
+              )
+              .join(" ")}
+            <br />點單字可跳到查單字頁面自行輸入意思</div>`
+        : ""
+    }`;
 
   updateDueBadge();
   renderWordList();
@@ -456,6 +594,13 @@ function initGlobalEvents() {
     if (action === "grade") gradeCurrentWord(Number(target.dataset.grade));
     if (action === "answer") handleQuizAnswer(Number(target.dataset.index));
     if (action === "next-question") goToNextReviewCard();
+    if (action === "search-word") {
+      $("#search-input").value = target.dataset.word;
+      doSearch(target.dataset.word);
+    }
+    if (action === "manual-entry") renderManualEntryForm(target.dataset.word);
+    if (action === "save-manual") saveManualWord(target.dataset.word);
+    if (action === "manual-entry-jump") jumpToManualEntry(target.dataset.word);
   });
 
   $("#list-filter").addEventListener("input", renderWordList);
