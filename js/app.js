@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=7";
-import { generateMnemonic } from "./mnemonic.js?v=7";
-import { translateToChinese } from "./translate.js?v=7";
-import * as store from "./storage.js?v=7";
-import * as srs from "./srs.js?v=7";
-import * as quiz from "./quiz.js?v=7";
-import * as cloud from "./cloud-sync.js?v=7";
+} from "./dictionary.js?v=8";
+import { generateMnemonic } from "./mnemonic.js?v=8";
+import { translateToChinese } from "./translate.js?v=8";
+import * as store from "./storage.js?v=8";
+import * as srs from "./srs.js?v=8";
+import * as quiz from "./quiz.js?v=8";
+import * as cloud from "./cloud-sync.js?v=8";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -605,6 +605,16 @@ function renderCurrentReviewCard() {
   }
 }
 
+// Predicted recall probability right now, per the Ebbinghaus forgetting-
+// curve formula (srs.retention) — shown during review/flashcards so the
+// schedule isn't just an opaque date, but a number grounded in the theory.
+function retentionBadge(card) {
+  const r = srs.retention(card);
+  if (r === null) return "";
+  const pct = Math.round(Math.max(0, Math.min(1, r)) * 100);
+  return `<div class="retention-badge">📉 遺忘曲線預測記憶保留率：<strong>${pct}%</strong></div>`;
+}
+
 // GRE-style multiple-choice question (cloze / definition / synonym)
 function renderQuizCard(w, allWords) {
   const area = $("#review-area");
@@ -615,6 +625,7 @@ function renderQuizCard(w, allWords) {
   area.innerHTML = `
     <div class="review-card">
       <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length}</div>
+      ${retentionBadge(w.srs)}
       ${q.sentence ? `<div class="cloze-sentence">${escapeHtml(q.sentence)}</div>` : ""}
       <div class="quiz-prompt">${escapeHtml(q.prompt)}</div>
       <div class="quiz-options ${longOptions ? "quiz-options-long" : ""}">
@@ -668,6 +679,7 @@ function renderFlashcardReview(w) {
     <div class="review-card">
       <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length}</div>
       <p class="status">再收藏 ${Math.max(0, 4 - store.loadWords().length)} 個單字即可解鎖選擇題複習模式</p>
+      ${retentionBadge(w.srs)}
       <div class="review-word">${escapeHtml(w.word)}</div>
       <div class="phonetic">${escapeHtml(w.phonetic || "")}</div>
       <button class="reveal-btn" data-action="reveal">看看你記得嗎？</button>
@@ -737,6 +749,7 @@ function renderCurrentFlashcard() {
   area.innerHTML = `
     <div class="review-card">
       <div class="review-progress">字卡 ${flashcardIndex + 1} / ${flashcardOrder.length}</div>
+      ${retentionBadge(word.srs)}
       <div class="review-word">${escapeHtml(word.word)}</div>
       <div class="phonetic">${escapeHtml(word.phonetic || "")}</div>
       <button class="reveal-btn" data-action="flip-card">翻面看意思</button>
@@ -781,6 +794,11 @@ function renderStats() {
   const forecastData = srs.forecast(words, 7);
   const maxCount = Math.max(1, ...forecastData);
 
+  const retentions = words.map((w) => srs.retention(w.srs)).filter((r) => r !== null);
+  const avgRetention = retentions.length
+    ? Math.round((retentions.reduce((a, b) => a + b, 0) / retentions.length) * 100)
+    : null;
+
   const dayLabels = Array.from({ length: 7 }, (_, i) => {
     if (i === 0) return "今天";
     if (i === 1) return "明天";
@@ -791,6 +809,7 @@ function renderStats() {
     <div class="stat-tile"><div class="num">${words.length}</div><div class="label">總收藏單字</div></div>
     <div class="stat-tile"><div class="num">${dueToday}</div><div class="label">今日待複習</div></div>
     <div class="stat-tile"><div class="num">${streak}</div><div class="label">連續複習天數</div></div>
+    <div class="stat-tile"><div class="num">${avgRetention === null ? "—" : avgRetention + "%"}</div><div class="label">平均記憶保留率</div></div>
     <div class="forecast" style="grid-column: 1 / -1">
       <h3>未來 7 天複習量預測</h3>
       <div class="forecast-bars">

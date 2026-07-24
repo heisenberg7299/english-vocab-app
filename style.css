@@ -417,6 +417,16 @@ body {
 .review-progress { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
 .review-word { font-size: 32px; font-weight: 700; margin: 10px 0; }
 .review-answer { text-align: left; margin-top: 18px; border-top: 1px solid var(--border); padding-top: 16px; }
+.retention-badge {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--muted);
+  background: #f1f5f9;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+}
+.retention-badge strong { color: var(--primary); }
 .cloze-sentence {
   text-align: left;
   font-size: 18px;
@@ -531,6 +541,7 @@ body {
   .mnemonic-box { background: #2a2412; border-color: #7c5a12; }
   .actions button { background: #1a2233; color: var(--text); border-color: var(--border); }
   .cloze-sentence { background: #1e2740; }
+  .retention-badge { background: #1e2740; }
   .quiz-option { background: #1a2233; color: var(--text); border-color: var(--border); }
   .quiz-option.correct { background: #14351f; border-color: #22c55e; color: #86efac; }
   .quiz-option.wrong { background: #3a1a1a; border-color: #ef4444; color: #fca5a5; }
