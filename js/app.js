@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=6";
-import { generateMnemonic } from "./mnemonic.js?v=6";
-import { translateToChinese } from "./translate.js?v=6";
-import * as store from "./storage.js?v=6";
-import * as srs from "./srs.js?v=6";
-import * as quiz from "./quiz.js?v=6";
-import * as cloud from "./cloud-sync.js?v=6";
+} from "./dictionary.js?v=7";
+import { generateMnemonic } from "./mnemonic.js?v=7";
+import { translateToChinese } from "./translate.js?v=7";
+import * as store from "./storage.js?v=7";
+import * as srs from "./srs.js?v=7";
+import * as quiz from "./quiz.js?v=7";
+import * as cloud from "./cloud-sync.js?v=7";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -51,8 +51,14 @@ function escapeHtml(str = "") {
   }[c]));
 }
 
+const FAMILIARITY_LEVELS = [
+  ["red", "不熟"],
+  ["yellow", "普通"],
+  ["green", "熟悉"],
+];
+
 function renderWordCard(data, opts = {}) {
-  const { saved = false, showAddButton = true } = opts;
+  const { saved = false, showAddButton = true, showFamiliarity = true } = opts;
 
   const meaningsHtml = data.meanings
     .map(
@@ -101,6 +107,17 @@ function renderWordCard(data, opts = {}) {
     ? `<button class="translate-btn" data-action="translate" data-word="${escapeHtml(data.word)}">🈶 翻譯成中文</button>`
     : "";
 
+  const familiarityHtml =
+    saved && showFamiliarity
+      ? `<div class="familiarity-row">
+           <span class="label">熟悉度</span>
+           ${FAMILIARITY_LEVELS.map(
+             ([level, label]) =>
+               `<button class="fam-btn fam-${level} ${data.familiarity === level ? "active" : ""}" data-action="set-familiarity" data-word="${escapeHtml(data.word)}" data-level="${level}">${label}</button>`
+           ).join("")}
+         </div>`
+      : "";
+
   const actionsHtml = showAddButton
     ? saved
       ? `<div class="actions">
@@ -126,6 +143,7 @@ function renderWordCard(data, opts = {}) {
       <div class="mnemonic-box">
         <span class="label">💡 好背誦的方法</span>${escapeHtml(mnemonic)}
       </div>
+      ${familiarityHtml}
       ${actionsHtml}
     </div>`;
 }
@@ -321,8 +339,14 @@ function renderWordList() {
       const due = srs.isDue(w.srs);
       const daysLeft = w.srs ? srs.daysUntilDue(w.srs) : 0;
       const dueLabel = due ? "今天複習" : `${daysLeft} 天後複習`;
+      const famClass = w.familiarity ? `fam-${w.familiarity}` : "";
+      const dotsHtml = FAMILIARITY_LEVELS.map(
+        ([level, label]) =>
+          `<button class="fam-dot fam-${level} ${w.familiarity === level ? "active" : ""}" title="${label}" data-action="set-familiarity" data-word="${escapeHtml(w.word)}" data-level="${level}"></button>`
+      ).join("");
       return `
-        <div class="word-chip" data-action="view" data-word="${escapeHtml(w.word)}">
+        <div class="word-chip ${famClass}" data-action="view" data-word="${escapeHtml(w.word)}">
+          <div class="fam-dots">${dotsHtml}</div>
           <h3>${escapeHtml(w.word)}</h3>
           ${w.chineseMeaning ? `<div class="chip-zh">${escapeHtml(w.chineseMeaning)}</div>` : ""}
           <div class="meta ${due ? "due-today" : ""}">${dueLabel} · 已複習 ${w.srs?.repetition || 0} 次</div>
@@ -348,6 +372,27 @@ async function translateWord(word) {
   if (shownCard && shownCard.dataset.wordCard.toLowerCase() === updated.word) {
     renderSearchResult(updated);
   }
+}
+
+// Self-rated familiarity (不熟/普通/熟悉), separate from the SRS ease
+// factor — shown as a colored highlight on the word's card in 我的單字本.
+function setFamiliarity(word, level) {
+  const data = store.getWord(word);
+  if (!data) return;
+
+  const updated = { ...data, familiarity: level };
+  store.upsertWord(updated);
+  if (lastSearchResult?.word === updated.word) lastSearchResult = updated;
+
+  const searchCard = $("#search-result [data-word-card]");
+  if (searchCard && searchCard.dataset.wordCard.toLowerCase() === word) {
+    renderSearchResult(updated);
+  }
+  const flashCard = $("#flashcard-answer [data-word-card]");
+  if (flashCard && flashCard.dataset.wordCard.toLowerCase() === word) {
+    flipCurrentFlashcard();
+  }
+  if (activeTab === "list") renderWordList();
 }
 
 // Backfills Chinese glosses for every saved word that doesn't have one yet
@@ -611,7 +656,7 @@ function handleQuizAnswer(index) {
     <div class="quiz-result ${correct ? "quiz-correct" : "quiz-wrong"}">
       ${correct ? "✅ 答對了！" : `❌ 答錯了，正確答案：${escapeHtml(currentQuestion.correctAnswer)}`}
     </div>
-    ${renderWordCard(updated, { showAddButton: false })}
+    ${renderWordCard(updated, { showAddButton: false, showFamiliarity: false })}
     <button class="reveal-btn" data-action="next-question">下一題</button>`;
 }
 
@@ -632,7 +677,7 @@ function renderFlashcardReview(w) {
   $("[data-action='reveal']").addEventListener("click", () => {
     $("#review-answer").classList.remove("hidden");
     $("#review-answer").innerHTML = `
-      ${renderWordCard(w, { showAddButton: false })}
+      ${renderWordCard(w, { showAddButton: false, showFamiliarity: false })}
       <div class="grade-row">
         <button class="grade-btn grade-again" data-action="grade" data-grade="1">忘記了<small>1 天後再複習</small></button>
         <button class="grade-btn grade-hard" data-action="grade" data-grade="3">有點難<small>間隔較短</small></button>
@@ -807,6 +852,7 @@ function initGlobalEvents() {
     if (action === "prev-card") goToFlashcard(-1);
     if (action === "next-card") goToFlashcard(1);
     if (action === "shuffle-cards") shuffleFlashcards();
+    if (action === "set-familiarity") setFamiliarity(target.dataset.word, target.dataset.level);
   });
 
   $("#list-filter").addEventListener("input", renderWordList);

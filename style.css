@@ -347,17 +347,61 @@ body {
 }
 
 .word-chip {
+  position: relative;
   background: var(--card-bg);
   border-radius: 10px;
+  border: 2px solid transparent;
   padding: 14px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   cursor: pointer;
 }
 .word-chip:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-.word-chip h3 { margin: 0 0 4px; font-size: 17px; }
+.word-chip h3 { margin: 0 0 4px; font-size: 17px; padding-right: 60px; }
 .chip-zh { font-size: 13px; color: var(--text); margin-bottom: 4px; }
 .word-chip .meta { font-size: 12px; color: var(--muted); }
 .word-chip .due-today { color: var(--primary); font-weight: 600; }
+
+.word-chip.fam-red { border-color: #ef4444; background: #fef2f2; }
+.word-chip.fam-yellow { border-color: #eab308; background: #fefce8; }
+.word-chip.fam-green { border-color: #22c55e; background: #f0fdf4; }
+
+.fam-dots {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 4px;
+}
+.fam-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.fam-dot.fam-red { border-color: #ef4444; }
+.fam-dot.fam-yellow { border-color: #eab308; }
+.fam-dot.fam-green { border-color: #22c55e; }
+.fam-dot.fam-red.active { background: #ef4444; }
+.fam-dot.fam-yellow.active { background: #eab308; }
+.fam-dot.fam-green.active { background: #22c55e; }
+
+.familiarity-row { margin-top: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.familiarity-row .label { font-size: 13px; color: var(--muted); margin-right: 2px; }
+.fam-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+.fam-btn.fam-red.active { background: #ef4444; color: #fff; border-color: #ef4444; }
+.fam-btn.fam-yellow.active { background: #eab308; color: #fff; border-color: #eab308; }
+.fam-btn.fam-green.active { background: #22c55e; color: #fff; border-color: #22c55e; }
 
 .empty-hint { color: var(--muted); text-align: center; margin-top: 40px; }
 .empty-hint.hidden { display: none; }
@@ -502,4 +546,8 @@ body {
   .auth-panel input { background: #0f1420; color: var(--text); border-color: var(--border); }
   .auth-actions button { background: #1a2233; color: var(--text); border-color: var(--border); }
   .flashcard-nav button { background: #1a2233; color: var(--text); border-color: var(--border); }
+  .word-chip.fam-red { background: #2a1414; }
+  .word-chip.fam-yellow { background: #2a2414; }
+  .word-chip.fam-green { background: #14261a; }
+  .fam-btn { background: #1a2233; color: var(--text); border-color: var(--border); }
 }
