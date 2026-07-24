@@ -223,7 +223,7 @@ body {
 }
 .manual-form-actions { display: flex; }
 
-.list-toolbar { margin-bottom: 12px; display: flex; gap: 8px; }
+.list-toolbar { margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
 .list-toolbar input {
   flex: 1;
   padding: 10px 12px;

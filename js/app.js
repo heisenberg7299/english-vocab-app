@@ -335,6 +335,39 @@ async function translateWord(word) {
   }
 }
 
+// Backfills Chinese glosses for every saved word that doesn't have one yet
+// (words added before this feature existed, or whose translation failed).
+async function backfillChineseTranslations() {
+  const btn = $("#backfill-zh-btn");
+  const status = $("#backfill-status");
+  const targets = store.loadWords().filter((w) => !w.chineseMeaning);
+
+  if (!targets.length) {
+    status.textContent = "所有單字都已經有中文了";
+    status.classList.remove("error");
+    return;
+  }
+
+  btn.disabled = true;
+  let done = 0;
+  let filled = 0;
+
+  for (const w of targets) {
+    status.textContent = `補上中文中... ${done + 1} / ${targets.length}`;
+    const chineseMeaning = await translateToChinese(w.word);
+    if (chineseMeaning) {
+      store.upsertWord({ ...w, chineseMeaning });
+      filled += 1;
+    }
+    done += 1;
+    if (done < targets.length) await new Promise((r) => setTimeout(r, 200));
+  }
+
+  btn.disabled = false;
+  status.textContent = `完成，${filled} / ${targets.length} 個單字補上了中文`;
+  renderWordList();
+}
+
 function viewWordDetail(word) {
   const data = store.getWord(word);
   if (!data) return;
@@ -351,6 +384,7 @@ function initImport() {
     $("#import-panel").classList.toggle("hidden");
   });
   $("#import-start-btn").addEventListener("click", runBulkImport);
+  $("#backfill-zh-btn").addEventListener("click", backfillChineseTranslations);
 }
 
 function parseImportInput(raw) {
