@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=5";
-import { generateMnemonic } from "./mnemonic.js?v=5";
-import { translateToChinese } from "./translate.js?v=5";
-import * as store from "./storage.js?v=5";
-import * as srs from "./srs.js?v=5";
-import * as quiz from "./quiz.js?v=5";
-import * as cloud from "./cloud-sync.js?v=5";
+} from "./dictionary.js?v=6";
+import { generateMnemonic } from "./mnemonic.js?v=6";
+import { translateToChinese } from "./translate.js?v=6";
+import * as store from "./storage.js?v=6";
+import * as srs from "./srs.js?v=6";
+import * as quiz from "./quiz.js?v=6";
+import * as cloud from "./cloud-sync.js?v=6";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -64,10 +64,7 @@ function renderWordCard(data, opts = {}) {
             (d) => `
             <div class="def-item">
               <span class="def-label">解釋</span> ${escapeHtml(d.definition)}
-              <div class="def-example">
-                <span class="def-label">例句</span>
-                ${d.example ? `"${escapeHtml(d.example)}"` : `<span class="def-missing">目前查無例句</span>`}
-              </div>
+              ${d.example ? `<div class="def-example"><span class="def-label">例句</span> "${escapeHtml(d.example)}"</div>` : ""}
             </div>`
           )
           .join("")}

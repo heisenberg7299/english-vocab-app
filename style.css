@@ -194,7 +194,6 @@ body {
 }
 .def-item { margin: 6px 0 6px 18px; font-size: 15px; }
 .def-example { color: var(--muted); font-size: 13px; font-style: italic; margin-top: 2px; }
-.def-missing { font-style: normal; opacity: 0.7; }
 .def-label {
   display: inline-block;
   font-size: 11px;
