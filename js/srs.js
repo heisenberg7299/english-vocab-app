@@ -165,11 +165,24 @@ function weightedSample(candidates, count, temperature) {
 // priority, take the top (limit - exploreCount), then fill the rest with a
 // priority-weighted random draw from what's left so mid-priority words
 // don't get starved forever by whatever's topping the list.
+// Self-rated familiarity (紅/黃/綠, set from the word card) nudges the
+// score on top of the objective SRS priority — marking something "不熟"
+// makes it more likely to come up for review, "熟悉" less likely, since
+// the user's own sense of a word is a signal worth listening to alongside
+// the forgetting-curve math.
+const FAMILIARITY_ADJUSTMENT = { red: 0.15, yellow: 0, green: -0.15 };
+
 export function selectDailyWords(words, limit = 15, exploreCount = 2) {
   const today = new Date();
   const candidates = words
     .filter((w) => w.srs && !cooldownActive(w.srs, today))
-    .map((w) => ({ word: w, priority: priorityScore(w.srs, today) + Math.random() * 0.001 }));
+    .map((w) => ({
+      word: w,
+      priority:
+        priorityScore(w.srs, today) +
+        (FAMILIARITY_ADJUSTMENT[w.familiarity] || 0) +
+        Math.random() * 0.001,
+    }));
 
   candidates.sort((a, b) => b.priority - a.priority);
 

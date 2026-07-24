@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=15";
-import { generateMnemonic } from "./mnemonic.js?v=15";
-import { translateToChinese } from "./translate.js?v=15";
-import * as store from "./storage.js?v=15";
-import * as srs from "./srs.js?v=15";
-import * as quiz from "./quiz.js?v=15";
-import * as cloud from "./cloud-sync.js?v=15";
+} from "./dictionary.js?v=16";
+import { generateMnemonic } from "./mnemonic.js?v=16";
+import { translateToChinese } from "./translate.js?v=16";
+import * as store from "./storage.js?v=16";
+import * as srs from "./srs.js?v=16";
+import * as quiz from "./quiz.js?v=16";
+import * as cloud from "./cloud-sync.js?v=16";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -883,7 +883,7 @@ function flipCurrentFlashcard() {
   if (!word) return;
   const answer = $("#flashcard-answer");
   answer.classList.remove("hidden");
-  answer.innerHTML = renderWordCard(word, { showAddButton: false });
+  answer.innerHTML = renderWordCard(word, { showAddButton: false, saved: true });
   $("[data-action='flip-card']")?.remove();
 }
 
