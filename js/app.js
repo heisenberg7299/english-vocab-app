@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=9";
-import { generateMnemonic } from "./mnemonic.js?v=9";
-import { translateToChinese } from "./translate.js?v=9";
-import * as store from "./storage.js?v=9";
-import * as srs from "./srs.js?v=9";
-import * as quiz from "./quiz.js?v=9";
-import * as cloud from "./cloud-sync.js?v=9";
+} from "./dictionary.js?v=10";
+import { generateMnemonic } from "./mnemonic.js?v=10";
+import { translateToChinese } from "./translate.js?v=10";
+import * as store from "./storage.js?v=10";
+import * as srs from "./srs.js?v=10";
+import * as quiz from "./quiz.js?v=10";
+import * as cloud from "./cloud-sync.js?v=10";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -528,7 +528,10 @@ async function runBulkImport() {
 
 // ---------- Review tab ----------
 const DAILY_REVIEW_LIMIT = 15;
-const REVIEW_SESSION_KEY = "review_session_v1";
+// Bump this key's suffix whenever the selection algorithm changes underneath
+// it — otherwise a session pinned under the old logic keeps being reused
+// (same date = same day) instead of being recomputed with the new one.
+const REVIEW_SESSION_KEY = "review_session_v2";
 
 let reviewQueue = [];
 let reviewIndex = 0;
