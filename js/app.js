@@ -181,6 +181,82 @@ function viewWordDetail(word) {
   $("#search-result").innerHTML = renderWordCard(data, { saved: true });
 }
 
+// ---------- Bulk import ----------
+function initImport() {
+  $("#import-toggle-btn").addEventListener("click", () => {
+    $("#import-panel").classList.toggle("hidden");
+  });
+  $("#import-start-btn").addEventListener("click", runBulkImport);
+}
+
+function parseImportInput(raw) {
+  const seen = new Set();
+  const words = [];
+  for (const piece of raw.split(/[,，、\n]+/)) {
+    const w = piece.trim().toLowerCase();
+    if (!w || seen.has(w)) continue;
+    seen.add(w);
+    words.push(w);
+  }
+  return words;
+}
+
+async function runBulkImport() {
+  const textarea = $("#import-textarea");
+  const words = parseImportInput(textarea.value);
+  const startBtn = $("#import-start-btn");
+  const progress = $("#import-progress");
+  const resultBox = $("#import-result");
+
+  if (!words.length) {
+    resultBox.innerHTML = `<span class="import-fail">請先貼上至少一個單字</span>`;
+    return;
+  }
+
+  startBtn.disabled = true;
+  resultBox.innerHTML = "";
+  const added = [];
+  const skipped = [];
+  const failed = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    progress.textContent = `匯入中... ${i + 1} / ${words.length}`;
+
+    if (store.getWord(word)) {
+      skipped.push(word);
+    } else {
+      try {
+        const data = await lookupWord(word);
+        const mnemonic = generateMnemonic(data.word, data.meanings[0]?.definitions[0]?.definition || "");
+        store.upsertWord({
+          ...data,
+          mnemonic,
+          addedDate: new Date().toISOString().slice(0, 10),
+          srs: srs.newCard(),
+        });
+        added.push(data.word);
+      } catch {
+        failed.push(word);
+      }
+    }
+
+    // be polite to the free public API
+    if (i < words.length - 1) await new Promise((r) => setTimeout(r, 200));
+  }
+
+  progress.textContent = "";
+  startBtn.disabled = false;
+  textarea.value = "";
+  resultBox.innerHTML = `
+    ${added.length ? `<div class="import-ok">✅ 已加入 ${added.length} 個：${escapeHtml(added.join(", "))}</div>` : ""}
+    ${skipped.length ? `<div>⏭️ 已存在，略過 ${skipped.length} 個：${escapeHtml(skipped.join(", "))}</div>` : ""}
+    ${failed.length ? `<div class="import-fail">❌ 查詢失敗 ${failed.length} 個：${escapeHtml(failed.join(", "))}</div>` : ""}`;
+
+  updateDueBadge();
+  renderWordList();
+}
+
 // ---------- Review tab ----------
 let reviewQueue = [];
 let reviewIndex = 0;
@@ -388,5 +464,6 @@ function initGlobalEvents() {
 // ---------- Init ----------
 initTabs();
 initSearch();
+initImport();
 initGlobalEvents();
 updateDueBadge();

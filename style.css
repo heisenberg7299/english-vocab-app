@@ -151,14 +151,58 @@ body {
 .actions .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .actions .danger { color: var(--danger); border-color: #fecaca; }
 
-.list-toolbar { margin-bottom: 12px; }
+.list-toolbar { margin-bottom: 12px; display: flex; gap: 8px; }
 .list-toolbar input {
-  width: 100%;
+  flex: 1;
   padding: 10px 12px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   font-size: 14px;
 }
+.list-toolbar button {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.import-panel {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.import-panel.hidden { display: none; }
+.import-hint { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.import-panel textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+.import-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.import-actions button {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.import-actions button:disabled { opacity: 0.6; cursor: default; }
+.import-progress { font-size: 13px; color: var(--muted); }
+#import-result { margin-top: 12px; font-size: 13px; line-height: 1.7; }
+#import-result .import-fail { color: var(--danger); }
+#import-result .import-ok { color: var(--accent); }
 
 .word-grid {
   display: grid;
@@ -297,4 +341,6 @@ body {
   .quiz-option { background: #1a2233; color: var(--text); border-color: var(--border); }
   .quiz-option.correct { background: #14351f; border-color: #22c55e; color: #86efac; }
   .quiz-option.wrong { background: #3a1a1a; border-color: #ef4444; color: #fca5a5; }
+  .list-toolbar button { background: #1a2233; color: var(--text); }
+  .import-panel textarea { background: #0f1420; color: var(--text); border-color: var(--border); }
 }

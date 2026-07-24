@@ -40,7 +40,19 @@
     <section id="tab-list" class="tab-panel">
       <div class="list-toolbar">
         <input id="list-filter" type="text" placeholder="搜尋單字本..." />
+        <button id="import-toggle-btn" type="button">＋ 批次匯入單字</button>
       </div>
+
+      <div id="import-panel" class="import-panel hidden">
+        <p class="import-hint">貼上單字清單，用逗號、頓號或換行分隔，會自動逐一查詢字典並加入單字本。</p>
+        <textarea id="import-textarea" rows="5" placeholder="例如：slight, trivial, pivotal, imperative"></textarea>
+        <div class="import-actions">
+          <button id="import-start-btn" type="button" class="primary">開始匯入</button>
+          <span id="import-progress" class="import-progress"></span>
+        </div>
+        <div id="import-result"></div>
+      </div>
+
       <div id="word-list" class="word-grid"></div>
       <p id="list-empty" class="empty-hint hidden">
         還沒有收藏的單字。到「查單字」頁面搜尋並加入單字本吧！
