@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=8";
-import { generateMnemonic } from "./mnemonic.js?v=8";
-import { translateToChinese } from "./translate.js?v=8";
-import * as store from "./storage.js?v=8";
-import * as srs from "./srs.js?v=8";
-import * as quiz from "./quiz.js?v=8";
-import * as cloud from "./cloud-sync.js?v=8";
+} from "./dictionary.js?v=9";
+import { generateMnemonic } from "./mnemonic.js?v=9";
+import { translateToChinese } from "./translate.js?v=9";
+import * as store from "./storage.js?v=9";
+import * as srs from "./srs.js?v=9";
+import * as quiz from "./quiz.js?v=9";
+import * as cloud from "./cloud-sync.js?v=9";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -336,9 +336,8 @@ function renderWordList() {
 
   grid.innerHTML = words
     .map((w) => {
-      const due = srs.isDue(w.srs);
-      const daysLeft = w.srs ? srs.daysUntilDue(w.srs) : 0;
-      const dueLabel = due ? "今天複習" : `${daysLeft} 天後複習`;
+      const retentionPct = w.srs ? Math.round(Math.max(0, Math.min(1, srs.retention(w.srs))) * 100) : null;
+      const lowRetention = retentionPct !== null && retentionPct < 90;
       const famClass = w.familiarity ? `fam-${w.familiarity}` : "";
       const dotsHtml = FAMILIARITY_LEVELS.map(
         ([level, label]) =>
@@ -349,7 +348,7 @@ function renderWordList() {
           <div class="fam-dots">${dotsHtml}</div>
           <h3>${escapeHtml(w.word)}</h3>
           ${w.chineseMeaning ? `<div class="chip-zh">${escapeHtml(w.chineseMeaning)}</div>` : ""}
-          <div class="meta ${due ? "due-today" : ""}">${dueLabel} · 已複習 ${w.srs?.repetition || 0} 次</div>
+          <div class="meta ${lowRetention ? "due-today" : ""}">記憶保留率 ${retentionPct ?? "—"}% · 已複習 ${w.srs?.reviews || 0} 次</div>
         </div>`;
     })
     .join("");
@@ -535,20 +534,15 @@ let reviewQueue = [];
 let reviewIndex = 0;
 let currentQuestion = null;
 
-// Caps today's review to DAILY_REVIEW_LIMIT words, even if more are overdue,
-// so a backlog doesn't dump 50 cards on you at once. When there's a
-// backlog, the words most overdue / most often gotten wrong (srs.priorityScore)
-// fill the limited slots first instead of whichever was added first — no
-// real GRE/IELTS frequency data exists to rank against, so "needs more
-// review" is judged from your own performance instead. Which words count
-// as "today's batch" is pinned to a date-stamped list in localStorage, so
-// re-opening the tab doesn't hand out a fresh 15 on top of ones already
-// reviewed — anything past the cap just waits and surfaces again tomorrow.
-function getTodayReviewQueue(dueWords) {
-  const byPriority = [...dueWords].sort(
-    (a, b) => srs.priorityScore(b.srs) - srs.priorityScore(a.srs)
-  );
-
+// No fixed due date anymore — every word has a priority score (forgetting
+// risk + difficulty + lapse history, see srs.js) and each day the top
+// DAILY_REVIEW_LIMIT across the whole library get selected (mostly the
+// highest-priority ones, plus a couple of weighted-random picks so
+// mid-priority words don't get starved forever). Which words count as
+// "today's batch" is pinned to a date-stamped list in localStorage, so
+// re-opening the tab doesn't hand out a fresh batch on top of ones already
+// reviewed — the rest just wait for tomorrow's selection.
+function getTodayReviewQueue(allWords) {
   const today = new Date().toISOString().slice(0, 10);
   let session;
   try {
@@ -558,17 +552,17 @@ function getTodayReviewQueue(dueWords) {
   }
 
   if (!session || session.date !== today) {
-    session = { date: today, words: byPriority.slice(0, DAILY_REVIEW_LIMIT).map((w) => w.word) };
+    const picked = srs.selectDailyWords(allWords.filter((w) => w.srs), DAILY_REVIEW_LIMIT);
+    session = { date: today, words: picked.map((w) => w.word) };
     localStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(session));
   }
 
-  const sessionWords = new Set(session.words);
-  return byPriority.filter((w) => sessionWords.has(w.word));
+  const byWord = new Map(allWords.map((w) => [w.word, w]));
+  return session.words.map((key) => byWord.get(key)).filter(Boolean);
 }
 
 function buildReviewQueue() {
-  const due = store.loadWords().filter((w) => srs.isDue(w.srs));
-  reviewQueue = getTodayReviewQueue(due);
+  reviewQueue = getTodayReviewQueue(store.loadWords());
   reviewIndex = 0;
 }
 
@@ -710,16 +704,18 @@ function gradeCurrentWord(quality) {
 
 // ---------- Flashcards tab ----------
 // Free browsing through every saved word, any time — no daily cap, no
-// grading, unlike the SRS-scheduled review tab. Just flip through them.
-let flashcardOrder = [];
-let flashcardIndex = 0;
+// grading, unlike the SRS-scheduled review tab. An endless random stream:
+// every "next" draws a fresh random word (with replacement) instead of
+// working through a fixed deck, so there's no "X / Y" count that implies
+// an end. A small history lets "prev" step back through what you've seen
+// this session.
+let flashcardHistory = [];
+let flashcardHistoryPos = -1;
 
 function renderFlashcards() {
   const words = store.loadWords();
-  const area = $("#flashcard-area");
-
   if (!words.length) {
-    area.innerHTML = `
+    $("#flashcard-area").innerHTML = `
       <div class="review-empty">
         <div class="big">🈳</div>
         <p>還沒有收藏的單字，先去查單字加幾個吧！</p>
@@ -727,43 +723,48 @@ function renderFlashcards() {
     return;
   }
 
-  // keep current order/position where possible; drop removed words, append new ones
-  const existingKeys = new Set(words.map((w) => w.word));
-  flashcardOrder = flashcardOrder.filter((k) => existingKeys.has(k));
-  for (const w of words) {
-    if (!flashcardOrder.includes(w.word)) flashcardOrder.push(w.word);
+  const current = flashcardHistory[flashcardHistoryPos];
+  if (!current || !store.getWord(current)) {
+    drawRandomFlashcard();
+  } else {
+    renderCurrentFlashcard();
   }
-  if (flashcardIndex >= flashcardOrder.length) flashcardIndex = 0;
+}
 
+function drawRandomFlashcard() {
+  const words = store.loadWords();
+  if (!words.length) return;
+  const pick = words[Math.floor(Math.random() * words.length)].word;
+  flashcardHistory = flashcardHistory.slice(0, flashcardHistoryPos + 1);
+  flashcardHistory.push(pick);
+  flashcardHistoryPos = flashcardHistory.length - 1;
   renderCurrentFlashcard();
 }
 
 function renderCurrentFlashcard() {
   const area = $("#flashcard-area");
-  const word = store.getWord(flashcardOrder[flashcardIndex]);
+  const word = store.getWord(flashcardHistory[flashcardHistoryPos]);
   if (!word) {
-    renderFlashcards();
+    drawRandomFlashcard();
     return;
   }
 
   area.innerHTML = `
     <div class="review-card">
-      <div class="review-progress">字卡 ${flashcardIndex + 1} / ${flashcardOrder.length}</div>
       ${retentionBadge(word.srs)}
       <div class="review-word">${escapeHtml(word.word)}</div>
       <div class="phonetic">${escapeHtml(word.phonetic || "")}</div>
       <button class="reveal-btn" data-action="flip-card">翻面看意思</button>
       <div class="review-answer hidden" id="flashcard-answer"></div>
       <div class="flashcard-nav">
-        <button type="button" data-action="prev-card">⬅️ 上一個</button>
-        <button type="button" data-action="shuffle-cards">🔀 隨機排序</button>
+        <button type="button" data-action="prev-card" ${flashcardHistoryPos <= 0 ? "disabled" : ""}>⬅️ 上一個</button>
         <button type="button" data-action="next-card">下一個 ➡️</button>
       </div>
     </div>`;
 }
 
 function flipCurrentFlashcard() {
-  const word = store.getWord(flashcardOrder[flashcardIndex]);
+  const word = store.getWord(flashcardHistory[flashcardHistoryPos]);
   if (!word) return;
   const answer = $("#flashcard-answer");
   answer.classList.remove("hidden");
@@ -772,65 +773,37 @@ function flipCurrentFlashcard() {
 }
 
 function goToFlashcard(delta) {
-  if (!flashcardOrder.length) return;
-  flashcardIndex = (flashcardIndex + delta + flashcardOrder.length) % flashcardOrder.length;
-  renderCurrentFlashcard();
-}
-
-function shuffleFlashcards() {
-  for (let i = flashcardOrder.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [flashcardOrder[i], flashcardOrder[j]] = [flashcardOrder[j], flashcardOrder[i]];
+  if (delta < 0) {
+    if (flashcardHistoryPos > 0) {
+      flashcardHistoryPos -= 1;
+      renderCurrentFlashcard();
+    }
+    return;
   }
-  flashcardIndex = 0;
-  renderCurrentFlashcard();
+  drawRandomFlashcard();
 }
 
 // ---------- Stats tab ----------
 function renderStats() {
   const words = store.loadWords();
-  const dueToday = words.filter((w) => srs.isDue(w.srs)).length;
+  const todayBatch = getTodayReviewQueue(words).length;
   const streak = store.getStreak();
-  const forecastData = srs.forecast(words, 7);
-  const maxCount = Math.max(1, ...forecastData);
 
   const retentions = words.map((w) => srs.retention(w.srs)).filter((r) => r !== null);
   const avgRetention = retentions.length
     ? Math.round((retentions.reduce((a, b) => a + b, 0) / retentions.length) * 100)
     : null;
 
-  const dayLabels = Array.from({ length: 7 }, (_, i) => {
-    if (i === 0) return "今天";
-    if (i === 1) return "明天";
-    return `+${i}天`;
-  });
-
   $("#stats-area").innerHTML = `
     <div class="stat-tile"><div class="num">${words.length}</div><div class="label">總收藏單字</div></div>
-    <div class="stat-tile"><div class="num">${dueToday}</div><div class="label">今日待複習</div></div>
+    <div class="stat-tile"><div class="num">${todayBatch}</div><div class="label">今日複習批次</div></div>
     <div class="stat-tile"><div class="num">${streak}</div><div class="label">連續複習天數</div></div>
-    <div class="stat-tile"><div class="num">${avgRetention === null ? "—" : avgRetention + "%"}</div><div class="label">平均記憶保留率</div></div>
-    <div class="forecast" style="grid-column: 1 / -1">
-      <h3>未來 7 天複習量預測</h3>
-      <div class="forecast-bars">
-        ${forecastData
-          .map(
-            (count, i) => `
-            <div class="forecast-bar-wrap">
-              <div class="forecast-count">${count}</div>
-              <div class="forecast-bar" style="height:${(count / maxCount) * 100}%"></div>
-              <div class="forecast-day">${dayLabels[i]}</div>
-            </div>`
-          )
-          .join("")}
-      </div>
-    </div>`;
+    <div class="stat-tile"><div class="num">${avgRetention === null ? "—" : avgRetention + "%"}</div><div class="label">平均記憶保留率</div></div>`;
 }
 
 // ---------- Badge ----------
 function updateDueBadge() {
-  const due = store.loadWords().filter((w) => srs.isDue(w.srs));
-  const dueCount = getTodayReviewQueue(due).length;
+  const dueCount = getTodayReviewQueue(store.loadWords()).length;
   const badge = $("#due-badge");
   badge.textContent = dueCount;
   badge.classList.toggle("hidden", dueCount === 0);
@@ -870,7 +843,6 @@ function initGlobalEvents() {
     if (action === "flip-card") flipCurrentFlashcard();
     if (action === "prev-card") goToFlashcard(-1);
     if (action === "next-card") goToFlashcard(1);
-    if (action === "shuffle-cards") shuffleFlashcards();
     if (action === "set-familiarity") setFamiliarity(target.dataset.word, target.dataset.level);
   });
 
