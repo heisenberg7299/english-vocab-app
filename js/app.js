@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=18";
-import { generateMnemonic } from "./mnemonic.js?v=18";
-import { translateToChinese } from "./translate.js?v=18";
-import * as store from "./storage.js?v=18";
-import * as srs from "./srs.js?v=18";
-import * as quiz from "./quiz.js?v=18";
-import * as cloud from "./cloud-sync.js?v=18";
+} from "./dictionary.js?v=19";
+import { generateMnemonic } from "./mnemonic.js?v=19";
+import { translateToChinese } from "./translate.js?v=19";
+import * as store from "./storage.js?v=19";
+import * as srs from "./srs.js?v=19";
+import * as quiz from "./quiz.js?v=19";
+import * as cloud from "./cloud-sync.js?v=19";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];

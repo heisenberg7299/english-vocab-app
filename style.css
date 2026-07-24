@@ -1,6 +1,11 @@
 :root {
   --bg: #f6f8fb;
-  --bg-gradient: radial-gradient(circle at 10% 0%, #eef2ff 0%, #f6f8fb 32%, #f6f8fb 68%, #fdf2f8 100%);
+  --bg-gradient:
+    radial-gradient(circle at 8% -10%, rgba(96, 165, 250, 0.35) 0%, transparent 42%),
+    radial-gradient(circle at 100% 0%, rgba(167, 139, 250, 0.28) 0%, transparent 45%),
+    radial-gradient(circle at 90% 90%, rgba(244, 114, 182, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 5% 100%, rgba(52, 211, 153, 0.22) 0%, transparent 40%),
+    #f6f8fb;
   --card-bg: #ffffff;
   --text: #1f2937;
   --muted: #6b7280;
@@ -9,11 +14,22 @@
   --primary-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
   --accent: #16a34a;
   --accent2: #7c3aed;
+  --accent3: #db2777;
+  --accent4: #ea580c;
+  --accent5: #0891b2;
   --danger: #dc2626;
   --border: #e5e7eb;
   --radius: 14px;
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.09);
+
+  /* per-section identity colors, used to tint that tab's cards/tiles */
+  --sec-search: var(--primary);
+  --sec-list: var(--accent5);
+  --sec-review: var(--accent2);
+  --sec-flashcards: var(--accent4);
+  --sec-calendar: var(--accent3);
+  --sec-stats: var(--accent);
 }
 
 * { box-sizing: border-box; }
@@ -35,8 +51,10 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   padding: 20px 0 12px;
   position: sticky;
   top: 0;
-  background: var(--bg-gradient);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+  background: rgba(246, 248, 251, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
   z-index: 10;
 }
 
@@ -206,9 +224,11 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   padding: 18px 20px;
   box-shadow: var(--shadow-sm);
   margin-bottom: 14px;
-  border-top: 3px solid var(--primary);
+  border-top: 3px solid var(--sec-search);
   animation: fadeIn 0.25s ease;
 }
+#tab-review .card { border-top-color: var(--sec-review); }
+#tab-flashcards .card { border-top-color: var(--sec-flashcards); }
 
 .word-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .word-head h2 { margin: 0; font-size: 26px; }
@@ -363,13 +383,14 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
 .list-toolbar button {
   padding: 10px 16px;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(8, 145, 178, 0.3);
   background: var(--card-bg);
-  color: var(--text);
+  color: var(--sec-list);
   font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
 }
+.list-toolbar button:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
 .import-panel {
   background: var(--card-bg);
@@ -394,7 +415,7 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   padding: 10px 18px;
   border-radius: 8px;
   border: none;
-  background: var(--primary-gradient);
+  background: linear-gradient(135deg, #22d3ee, var(--sec-list));
   color: #fff;
   font-size: 14px;
   cursor: pointer;
@@ -416,13 +437,13 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   position: relative;
   background: var(--card-bg);
   border-radius: 10px;
-  border: 2px solid transparent;
+  border: 2px solid rgba(8, 145, 178, 0.2);
   padding: 14px;
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
-.word-chip:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.word-chip:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--sec-list); }
 .word-chip h3 { margin: 0 0 4px; font-size: 17px; padding-right: 60px; }
 .chip-zh { font-size: 13px; color: var(--text); margin-bottom: 4px; }
 .word-chip .meta { font-size: 12px; color: var(--muted); }
@@ -479,10 +500,13 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   border-radius: var(--radius);
   padding: 30px 24px;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-sm);
+  border-top: 4px solid var(--sec-review);
 }
+#tab-flashcards .review-card { border-top-color: var(--sec-flashcards); }
 .review-progress { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
-.review-card h3 { margin-top: 0; font-size: 18px; }
+.review-card h3 { margin-top: 0; font-size: 18px; color: var(--sec-review); }
+#tab-flashcards .review-card h3 { color: var(--sec-flashcards); }
 .preview-word-list {
   text-align: left;
   margin: 16px 0 24px;
@@ -563,14 +587,19 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   padding: 12px 26px;
   border-radius: 999px;
   border: none;
-  background: var(--primary-gradient);
+  background: linear-gradient(135deg, var(--accent2), var(--primary));
   color: #fff;
   font-size: 15px;
   cursor: pointer;
   margin-top: 10px;
-  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 3px 12px rgba(124, 58, 237, 0.3);
 }
-.reveal-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(37, 99, 235, 0.35); }
+.reveal-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(124, 58, 237, 0.4); }
+#tab-flashcards .reveal-btn {
+  background: linear-gradient(135deg, var(--accent4), #f59e0b);
+  box-shadow: 0 3px 12px rgba(234, 88, 12, 0.3);
+}
+#tab-flashcards .reveal-btn:hover { box-shadow: 0 5px 16px rgba(234, 88, 12, 0.4); }
 .grade-row { display: flex; gap: 8px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
 .grade-btn {
   flex: 1;
@@ -605,7 +634,7 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
 
 /* calendar */
 .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.cal-header h3 { margin: 0; font-size: 16px; }
+.cal-header h3 { margin: 0; font-size: 16px; color: var(--sec-calendar); }
 .cal-header button {
   border: 1px solid var(--border);
   background: var(--card-bg);
@@ -649,7 +678,7 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
 }
 .cal-cell.cal-empty { border: none; background: transparent; cursor: default; }
 .cal-day-num { font-size: 13px; }
-.cal-cell.cal-today { border-color: var(--primary); border-width: 2px; }
+.cal-cell.cal-today { border-color: var(--sec-calendar); border-width: 2px; }
 .cal-cell.cal-reviewed { background: #dcfce7; }
 .cal-badge { font-size: 9px; padding: 0 3px; border-radius: 4px; }
 .cal-badge.cal-added { background: #dbeafe; color: #1d4ed8; }
@@ -713,7 +742,7 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   .quiz-option { background: #1a2233; color: var(--text); border-color: var(--border); }
   .quiz-option.correct { background: #14351f; border-color: #22c55e; color: #86efac; }
   .quiz-option.wrong { background: #3a1a1a; border-color: #ef4444; color: #fca5a5; }
-  .list-toolbar button { background: #1a2233; color: var(--text); }
+  .list-toolbar button { background: #1a2233; color: #67e8f9; }
   .import-panel textarea { background: #0f1420; color: var(--text); border-color: var(--border); }
   .source-badge { background: #26314a; }
   .suggestion-chip { background: #1e2a4a; color: #93c5fd; border-color: var(--border); }
