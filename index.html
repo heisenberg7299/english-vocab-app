@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>單字背起來 · 英文單字學習</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1>📘 單字背起來</h1>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="search">查單字</button>
+      <button class="tab-btn" data-tab="list">我的單字本</button>
+      <button class="tab-btn" data-tab="review">
+        今日複習 <span id="due-badge" class="badge hidden">0</span>
+      </button>
+      <button class="tab-btn" data-tab="stats">統計</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- 查單字 -->
+    <section id="tab-search" class="tab-panel active">
+      <form id="search-form" class="search-form">
+        <input
+          id="search-input"
+          type="text"
+          placeholder="輸入你不會的英文單字，例如 ubiquitous"
+          autocomplete="off"
+        />
+        <button type="submit">查詢</button>
+      </form>
+      <div id="search-status" class="status"></div>
+      <div id="search-result"></div>
+    </section>
+
+    <!-- 我的單字本 -->
+    <section id="tab-list" class="tab-panel">
+      <div class="list-toolbar">
+        <input id="list-filter" type="text" placeholder="搜尋單字本..." />
+      </div>
+      <div id="word-list" class="word-grid"></div>
+      <p id="list-empty" class="empty-hint hidden">
+        還沒有收藏的單字。到「查單字」頁面搜尋並加入單字本吧！
+      </p>
+    </section>
+
+    <!-- 今日複習 -->
+    <section id="tab-review" class="tab-panel">
+      <div id="review-area"></div>
+    </section>
+
+    <!-- 統計 -->
+    <section id="tab-stats" class="tab-panel">
+      <div id="stats-area" class="stats-grid"></div>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
