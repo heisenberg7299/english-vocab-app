@@ -193,7 +193,19 @@ body {
   margin-bottom: 6px;
 }
 .def-item { margin: 6px 0 6px 18px; font-size: 15px; }
-.def-example { color: var(--muted); font-size: 13px; font-style: italic; }
+.def-example { color: var(--muted); font-size: 13px; font-style: italic; margin-top: 2px; }
+.def-missing { font-style: normal; opacity: 0.7; }
+.def-label {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 5px;
+  margin-right: 4px;
+  font-style: normal;
+}
 
 .tag-row { margin-top: 10px; font-size: 14px; }
 .tag-row .label { color: var(--muted); margin-right: 6px; }
@@ -472,6 +484,7 @@ body {
   .tag.syn { background: #14351f; color: #86efac; }
   .tag.ant { background: #3a1a1a; color: #fca5a5; }
   .pos-label { background: #1e2a4a; }
+  .def-label { background: #26314a; }
   .mnemonic-box { background: #2a2412; border-color: #7c5a12; }
   .actions button { background: #1a2233; color: var(--text); border-color: var(--border); }
   .cloze-sentence { background: #1e2740; }

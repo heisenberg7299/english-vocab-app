@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=4";
-import { generateMnemonic } from "./mnemonic.js?v=4";
-import { translateToChinese } from "./translate.js?v=4";
-import * as store from "./storage.js?v=4";
-import * as srs from "./srs.js?v=4";
-import * as quiz from "./quiz.js?v=4";
-import * as cloud from "./cloud-sync.js?v=4";
+} from "./dictionary.js?v=5";
+import { generateMnemonic } from "./mnemonic.js?v=5";
+import { translateToChinese } from "./translate.js?v=5";
+import * as store from "./storage.js?v=5";
+import * as srs from "./srs.js?v=5";
+import * as quiz from "./quiz.js?v=5";
+import * as cloud from "./cloud-sync.js?v=5";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -58,13 +58,16 @@ function renderWordCard(data, opts = {}) {
     .map(
       (m) => `
       <div class="pos-block">
-        <span class="pos-label">${escapeHtml(m.partOfSpeech || "")}</span>
+        <span class="pos-label">詞性：${escapeHtml(m.partOfSpeech || "不明")}</span>
         ${m.definitions
           .map(
             (d) => `
             <div class="def-item">
-              ${escapeHtml(d.definition)}
-              ${d.example ? `<div class="def-example">"${escapeHtml(d.example)}"</div>` : ""}
+              <span class="def-label">解釋</span> ${escapeHtml(d.definition)}
+              <div class="def-example">
+                <span class="def-label">例句</span>
+                ${d.example ? `"${escapeHtml(d.example)}"` : `<span class="def-missing">目前查無例句</span>`}
+              </div>
             </div>`
           )
           .join("")}
@@ -96,7 +99,7 @@ function renderWordCard(data, opts = {}) {
       : "";
 
   const chineseHtml = data.chineseMeaning
-    ? `<div class="chinese-meaning">🇹🇼 ${escapeHtml(data.chineseMeaning)}<span class="mt-note">（機器翻譯，僅供參考）</span></div>`
+    ? `<div class="chinese-meaning"><span class="def-label">中文意思</span> ${escapeHtml(data.chineseMeaning)}<span class="mt-note">（機器翻譯，僅供參考）</span></div>`
     : saved
     ? `<button class="translate-btn" data-action="translate" data-word="${escapeHtml(data.word)}">🈶 翻譯成中文</button>`
     : "";
