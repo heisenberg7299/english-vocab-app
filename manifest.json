@@ -1,0 +1,14 @@
+{
+  "name": "單字背起來",
+  "short_name": "單字背起來",
+  "description": "查單字、記憶技巧、間隔複習、GRE 選擇題",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f8fb",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
