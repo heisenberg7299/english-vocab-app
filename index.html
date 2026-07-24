@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>單字背起來 · 英文單字學習</title>
-<link rel="stylesheet" href="style.css?v=3" />
+<link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
 <div class="app">
@@ -33,6 +33,7 @@
       <button class="tab-btn" data-tab="review">
         今日複習 <span id="due-badge" class="badge hidden">0</span>
       </button>
+      <button class="tab-btn" data-tab="flashcards">字卡</button>
       <button class="tab-btn" data-tab="stats">統計</button>
     </nav>
   </header>
@@ -83,6 +84,11 @@
       <div id="review-area"></div>
     </section>
 
+    <!-- 字卡 -->
+    <section id="tab-flashcards" class="tab-panel">
+      <div id="flashcard-area"></div>
+    </section>
+
     <!-- 統計 -->
     <section id="tab-stats" class="tab-panel">
       <div id="stats-area" class="stats-grid"></div>
@@ -90,6 +96,6 @@
   </main>
 </div>
 
-<script type="module" src="js/app.js?v=3"></script>
+<script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>

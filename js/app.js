@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=3";
-import { generateMnemonic } from "./mnemonic.js?v=3";
-import { translateToChinese } from "./translate.js?v=3";
-import * as store from "./storage.js?v=3";
-import * as srs from "./srs.js?v=3";
-import * as quiz from "./quiz.js?v=3";
-import * as cloud from "./cloud-sync.js?v=3";
+} from "./dictionary.js?v=4";
+import { generateMnemonic } from "./mnemonic.js?v=4";
+import { translateToChinese } from "./translate.js?v=4";
+import * as store from "./storage.js?v=4";
+import * as srs from "./srs.js?v=4";
+import * as quiz from "./quiz.js?v=4";
+import * as cloud from "./cloud-sync.js?v=4";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -30,6 +30,7 @@ function switchTab(name) {
   $$(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${name}`));
   if (name === "list") renderWordList();
   if (name === "review") renderReview();
+  if (name === "flashcards") renderFlashcards();
   if (name === "stats") renderStats();
 }
 
@@ -38,6 +39,7 @@ function switchTab(name) {
 function refreshCurrentTab() {
   if (activeTab === "list") renderWordList();
   if (activeTab === "review") renderReview();
+  if (activeTab === "flashcards") renderFlashcards();
   if (activeTab === "stats") renderStats();
   updateDueBadge();
 }
@@ -649,6 +651,83 @@ function gradeCurrentWord(quality) {
   goToNextReviewCard();
 }
 
+// ---------- Flashcards tab ----------
+// Free browsing through every saved word, any time — no daily cap, no
+// grading, unlike the SRS-scheduled review tab. Just flip through them.
+let flashcardOrder = [];
+let flashcardIndex = 0;
+
+function renderFlashcards() {
+  const words = store.loadWords();
+  const area = $("#flashcard-area");
+
+  if (!words.length) {
+    area.innerHTML = `
+      <div class="review-empty">
+        <div class="big">🈳</div>
+        <p>還沒有收藏的單字，先去查單字加幾個吧！</p>
+      </div>`;
+    return;
+  }
+
+  // keep current order/position where possible; drop removed words, append new ones
+  const existingKeys = new Set(words.map((w) => w.word));
+  flashcardOrder = flashcardOrder.filter((k) => existingKeys.has(k));
+  for (const w of words) {
+    if (!flashcardOrder.includes(w.word)) flashcardOrder.push(w.word);
+  }
+  if (flashcardIndex >= flashcardOrder.length) flashcardIndex = 0;
+
+  renderCurrentFlashcard();
+}
+
+function renderCurrentFlashcard() {
+  const area = $("#flashcard-area");
+  const word = store.getWord(flashcardOrder[flashcardIndex]);
+  if (!word) {
+    renderFlashcards();
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="review-card">
+      <div class="review-progress">字卡 ${flashcardIndex + 1} / ${flashcardOrder.length}</div>
+      <div class="review-word">${escapeHtml(word.word)}</div>
+      <div class="phonetic">${escapeHtml(word.phonetic || "")}</div>
+      <button class="reveal-btn" data-action="flip-card">翻面看意思</button>
+      <div class="review-answer hidden" id="flashcard-answer"></div>
+      <div class="flashcard-nav">
+        <button type="button" data-action="prev-card">⬅️ 上一個</button>
+        <button type="button" data-action="shuffle-cards">🔀 隨機排序</button>
+        <button type="button" data-action="next-card">下一個 ➡️</button>
+      </div>
+    </div>`;
+}
+
+function flipCurrentFlashcard() {
+  const word = store.getWord(flashcardOrder[flashcardIndex]);
+  if (!word) return;
+  const answer = $("#flashcard-answer");
+  answer.classList.remove("hidden");
+  answer.innerHTML = renderWordCard(word, { showAddButton: false });
+  $("[data-action='flip-card']")?.remove();
+}
+
+function goToFlashcard(delta) {
+  if (!flashcardOrder.length) return;
+  flashcardIndex = (flashcardIndex + delta + flashcardOrder.length) % flashcardOrder.length;
+  renderCurrentFlashcard();
+}
+
+function shuffleFlashcards() {
+  for (let i = flashcardOrder.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [flashcardOrder[i], flashcardOrder[j]] = [flashcardOrder[j], flashcardOrder[i]];
+  }
+  flashcardIndex = 0;
+  renderCurrentFlashcard();
+}
+
 // ---------- Stats tab ----------
 function renderStats() {
   const words = store.loadWords();
@@ -724,6 +803,10 @@ function initGlobalEvents() {
     if (action === "manual-entry-jump") jumpToManualEntry(target.dataset.word);
     if (action === "translate") translateWord(target.dataset.word);
     if (action === "logout") cloud.logOut();
+    if (action === "flip-card") flipCurrentFlashcard();
+    if (action === "prev-card") goToFlashcard(-1);
+    if (action === "next-card") goToFlashcard(1);
+    if (action === "shuffle-cards") shuffleFlashcards();
   });
 
   $("#list-filter").addEventListener("input", renderWordList);

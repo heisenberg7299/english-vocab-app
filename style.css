@@ -435,6 +435,17 @@ body {
 .review-empty { text-align: center; padding: 60px 20px; color: var(--muted); }
 .review-empty .big { font-size: 40px; margin-bottom: 10px; }
 
+.flashcard-nav { display: flex; gap: 8px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+.flashcard-nav button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+}
+
 /* stats */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .stat-tile { background: var(--card-bg); border-radius: 12px; padding: 18px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
@@ -478,4 +489,5 @@ body {
   .auth-btn { background: #1a2233; color: var(--text); border-color: var(--border); }
   .auth-panel input { background: #0f1420; color: var(--text); border-color: var(--border); }
   .auth-actions button { background: #1a2233; color: var(--text); border-color: var(--border); }
+  .flashcard-nav button { background: #1a2233; color: var(--text); border-color: var(--border); }
 }
