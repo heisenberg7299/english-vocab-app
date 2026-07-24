@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=12";
-import { generateMnemonic } from "./mnemonic.js?v=12";
-import { translateToChinese } from "./translate.js?v=12";
-import * as store from "./storage.js?v=12";
-import * as srs from "./srs.js?v=12";
-import * as quiz from "./quiz.js?v=12";
-import * as cloud from "./cloud-sync.js?v=12";
+} from "./dictionary.js?v=13";
+import { generateMnemonic } from "./mnemonic.js?v=13";
+import { translateToChinese } from "./translate.js?v=13";
+import * as store from "./storage.js?v=13";
+import * as srs from "./srs.js?v=13";
+import * as quiz from "./quiz.js?v=13";
+import * as cloud from "./cloud-sync.js?v=13";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -546,17 +546,44 @@ const REVIEW_SESSION_KEY = "review_session_v3";
 let reviewQueue = [];
 let reviewIndex = 0;
 let currentQuestion = null;
+let reviewStarted = false;
+
+function isSunday(date = new Date()) {
+  return date.getDay() === 0;
+}
+
+// Monday of the calendar week containing `date`, as an ISO date string.
+function weekStartDate(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - diffToMonday);
+  return d.toISOString().slice(0, 10);
+}
+
+// Every word touched at least once since Monday — the Sunday wrap-up,
+// deliberately uncapped since the point is covering the whole week.
+function weeklyReviewedWords(allWords, today = new Date()) {
+  const start = weekStartDate(today);
+  const todayStr = today.toISOString().slice(0, 10);
+  return allWords.filter((w) => {
+    const history = w.srs?.reviewHistory || [];
+    return history.some((h) => h.date >= start && h.date <= todayStr);
+  });
+}
 
 // No fixed due date anymore — every word has a priority score (forgetting
 // risk + difficulty + lapse history, see srs.js) and each day the top
 // DAILY_REVIEW_LIMIT across the whole library get selected (mostly the
 // highest-priority ones, plus a couple of weighted-random picks so
-// mid-priority words don't get starved forever). Which words count as
-// "today's batch" is pinned to a date-stamped list in localStorage, so
-// re-opening the tab doesn't hand out a fresh batch on top of ones already
-// reviewed — the rest just wait for tomorrow's selection.
+// mid-priority words don't get starved forever). On Sundays, review
+// everything touched since Monday instead, with no cap, as a weekly
+// wrap-up. Which words count as "today's batch" is pinned to a
+// date-stamped list in localStorage, so re-opening the tab doesn't hand
+// out a fresh batch on top of ones already reviewed.
 function getTodayReviewQueue(allWords) {
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   let session;
   try {
     session = JSON.parse(localStorage.getItem(REVIEW_SESSION_KEY) || "null");
@@ -572,8 +599,12 @@ function getTodayReviewQueue(allWords) {
     // data has actually loaded) gets a real chance to pick a batch.
     if (!allWords.length) return [];
 
-    const picked = srs.selectDailyWords(allWords.filter((w) => w.srs), DAILY_REVIEW_LIMIT);
-    session = { date: today, words: picked.map((w) => w.word) };
+    const weekly = isSunday(now) ? weeklyReviewedWords(allWords, now) : [];
+    const picked = weekly.length
+      ? weekly
+      : srs.selectDailyWords(allWords.filter((w) => w.srs), DAILY_REVIEW_LIMIT);
+
+    session = { date: today, words: picked.map((w) => w.word), weekly: weekly.length > 0 };
     localStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(session));
   }
 
@@ -581,13 +612,58 @@ function getTodayReviewQueue(allWords) {
   return session.words.map((key) => byWord.get(key)).filter(Boolean);
 }
 
+function isTodayWeeklyReview() {
+  try {
+    const session = JSON.parse(localStorage.getItem(REVIEW_SESSION_KEY) || "null");
+    const today = new Date().toISOString().slice(0, 10);
+    return !!(session && session.date === today && session.weekly);
+  } catch {
+    return false;
+  }
+}
+
 function buildReviewQueue() {
   reviewQueue = getTodayReviewQueue(store.loadWords());
   reviewIndex = 0;
 }
 
+// Entering the review tab always shows a preview of what's coming up first
+// — the actual question flow only starts once the user clicks through it.
 function renderReview() {
   buildReviewQueue();
+  reviewStarted = false;
+  renderReviewPreview();
+}
+
+function renderReviewPreview() {
+  const area = $("#review-area");
+
+  if (!reviewQueue.length) {
+    area.innerHTML = `
+      <div class="review-empty">
+        <div class="big">📭</div>
+        <p>目前沒有需要複習的單字。</p>
+      </div>`;
+    return;
+  }
+
+  const weekly = isTodayWeeklyReview();
+  area.innerHTML = `
+    <div class="review-card">
+      <h3>${weekly ? "📅 本週總複習" : "📋 今日複習預告"}</h3>
+      <p class="status">
+        ${weekly ? "這禮拜複習過的" : "今天會複習這"} ${reviewQueue.length} 個單字：
+      </p>
+      <div class="preview-words">
+        ${reviewQueue.map((w) => `<span class="tag">${escapeHtml(w.word)}</span>`).join("")}
+      </div>
+      <button class="reveal-btn" data-action="start-review">開始複習</button>
+    </div>`;
+}
+
+function startReviewSession() {
+  reviewStarted = true;
+  reviewIndex = 0;
   renderCurrentReviewCard();
 }
 
@@ -851,6 +927,7 @@ function initGlobalEvents() {
     if (action === "grade") gradeCurrentWord(Number(target.dataset.grade));
     if (action === "answer") handleQuizAnswer(Number(target.dataset.index));
     if (action === "next-question") goToNextReviewCard();
+    if (action === "start-review") startReviewSession();
     if (action === "search-word") {
       $("#search-input").value = target.dataset.word;
       doSearch(target.dataset.word);

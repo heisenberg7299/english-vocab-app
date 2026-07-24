@@ -415,6 +415,14 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 .review-progress { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.review-card h3 { margin-top: 0; font-size: 18px; }
+.preview-words {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 16px 0 24px;
+}
 .review-word { font-size: 32px; font-weight: 700; margin: 10px 0; }
 .review-answer { text-align: left; margin-top: 18px; border-top: 1px solid var(--border); padding-top: 16px; }
 .retention-badge {
