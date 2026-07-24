@@ -108,6 +108,27 @@ body {
   border-radius: 999px;
 }
 
+.chinese-meaning {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--text);
+}
+.chinese-meaning .mt-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.translate-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
 .pos-block { margin-top: 14px; }
 .pos-label {
   display: inline-block;
@@ -270,6 +291,7 @@ body {
 }
 .word-chip:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 .word-chip h3 { margin: 0 0 4px; font-size: 17px; }
+.chip-zh { font-size: 13px; color: var(--text); margin-bottom: 4px; }
 .word-chip .meta { font-size: 12px; color: var(--muted); }
 .word-chip .due-today { color: var(--primary); font-weight: 600; }
 
@@ -399,4 +421,5 @@ body {
   .manual-toggle-btn { background: #1a2233; color: var(--text); border-color: var(--border); }
   .manual-form input,
   .manual-form textarea { background: #0f1420; color: var(--text); border-color: var(--border); }
+  .translate-btn { background: #1a2233; color: var(--text); border-color: var(--border); }
 }

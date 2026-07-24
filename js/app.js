@@ -6,6 +6,7 @@ import {
   WordNotFoundError,
 } from "./dictionary.js";
 import { generateMnemonic } from "./mnemonic.js";
+import { translateToChinese } from "./translate.js";
 import * as store from "./storage.js";
 import * as srs from "./srs.js";
 import * as quiz from "./quiz.js";
@@ -79,6 +80,12 @@ function renderWordCard(data, opts = {}) {
       ? `<span class="source-badge">來源：自行輸入</span>`
       : "";
 
+  const chineseHtml = data.chineseMeaning
+    ? `<div class="chinese-meaning">🇹🇼 ${escapeHtml(data.chineseMeaning)}<span class="mt-note">（機器翻譯，僅供參考）</span></div>`
+    : saved
+    ? `<button class="translate-btn" data-action="translate" data-word="${escapeHtml(data.word)}">🈶 翻譯成中文</button>`
+    : "";
+
   const actionsHtml = showAddButton
     ? saved
       ? `<div class="actions">
@@ -97,6 +104,7 @@ function renderWordCard(data, opts = {}) {
         ${data.audio ? `<button class="audio-btn" data-action="play-audio" data-src="${escapeHtml(data.audio)}">🔊</button>` : ""}
         ${sourceLabel}
       </div>
+      ${chineseHtml}
       ${meaningsHtml}
       ${synHtml}
       ${antHtml}
@@ -121,6 +129,13 @@ function initSearch() {
   });
 }
 
+// Best-effort Chinese gloss; silently omitted if the translation API has
+// nothing (attachChineseMeaning never throws, see translateToChinese).
+async function attachChineseMeaning(data) {
+  const chineseMeaning = await translateToChinese(data.word);
+  return chineseMeaning ? { ...data, chineseMeaning } : data;
+}
+
 async function doSearch(word) {
   const status = $("#search-status");
   const result = $("#search-result");
@@ -129,7 +144,7 @@ async function doSearch(word) {
   result.innerHTML = "";
 
   try {
-    const data = await lookupWord(word);
+    const data = await attachChineseMeaning(await lookupWord(word));
     lastSearchResult = data;
     status.textContent = "";
     renderSearchResult(data);
@@ -157,9 +172,10 @@ async function handleWordNotFound(word) {
 
   const fallback = await lookupWordFallback(word);
   if (fallback) {
-    lastSearchResult = fallback;
+    const withZh = await attachChineseMeaning(fallback);
+    lastSearchResult = withZh;
     status.textContent = "";
-    renderSearchResult(fallback);
+    renderSearchResult(withZh);
     return;
   }
 
@@ -209,7 +225,7 @@ function renderManualEntryForm(word) {
     </div>`;
 }
 
-function saveManualWord(word) {
+async function saveManualWord(word) {
   const def = $("#manual-def").value.trim();
   const statusEl = $("#manual-form-status");
   if (!def) {
@@ -218,11 +234,13 @@ function saveManualWord(word) {
     return;
   }
 
-  const data = buildManualWordData(word, {
-    partOfSpeech: $("#manual-pos").value,
-    definition: def,
-    example: $("#manual-example").value,
-  });
+  const data = await attachChineseMeaning(
+    buildManualWordData(word, {
+      partOfSpeech: $("#manual-pos").value,
+      definition: def,
+      example: $("#manual-example").value,
+    })
+  );
   const fullData = saveWordRecord(data);
 
   updateDueBadge();
@@ -291,10 +309,30 @@ function renderWordList() {
       return `
         <div class="word-chip" data-action="view" data-word="${escapeHtml(w.word)}">
           <h3>${escapeHtml(w.word)}</h3>
+          ${w.chineseMeaning ? `<div class="chip-zh">${escapeHtml(w.chineseMeaning)}</div>` : ""}
           <div class="meta ${due ? "due-today" : ""}">${dueLabel} · 已複習 ${w.srs?.repetition || 0} 次</div>
         </div>`;
     })
     .join("");
+}
+
+// Backfills a Chinese gloss for a word already saved before this feature
+// existed (or whose translation lookup failed the first time).
+async function translateWord(word) {
+  const data = store.getWord(word);
+  if (!data) return;
+
+  const chineseMeaning = await translateToChinese(data.word);
+  if (!chineseMeaning) return;
+
+  const updated = { ...data, chineseMeaning };
+  store.upsertWord(updated);
+
+  if (lastSearchResult?.word === updated.word) lastSearchResult = updated;
+  const shownCard = $("#search-result [data-word-card]");
+  if (shownCard && shownCard.dataset.wordCard.toLowerCase() === updated.word) {
+    renderSearchResult(updated);
+  }
 }
 
 function viewWordDetail(word) {
@@ -353,14 +391,14 @@ async function runBulkImport() {
       skipped.push(word);
     } else {
       try {
-        const data = await lookupWord(word);
+        const data = await attachChineseMeaning(await lookupWord(word));
         saveWordRecord(data);
         added.push(data.word);
       } catch {
         // primary dictionary doesn't have it — try the fallback before giving up
         const fallback = await lookupWordFallback(word);
         if (fallback) {
-          saveWordRecord(fallback);
+          saveWordRecord(await attachChineseMeaning(fallback));
           added.push(fallback.word);
         } else {
           failed.push(word);
@@ -601,6 +639,7 @@ function initGlobalEvents() {
     if (action === "manual-entry") renderManualEntryForm(target.dataset.word);
     if (action === "save-manual") saveManualWord(target.dataset.word);
     if (action === "manual-entry-jump") jumpToManualEntry(target.dataset.word);
+    if (action === "translate") translateWord(target.dataset.word);
   });
 
   $("#list-filter").addEventListener("input", renderWordList);
