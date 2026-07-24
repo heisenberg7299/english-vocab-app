@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=16";
-import { generateMnemonic } from "./mnemonic.js?v=16";
-import { translateToChinese } from "./translate.js?v=16";
-import * as store from "./storage.js?v=16";
-import * as srs from "./srs.js?v=16";
-import * as quiz from "./quiz.js?v=16";
-import * as cloud from "./cloud-sync.js?v=16";
+} from "./dictionary.js?v=17";
+import { generateMnemonic } from "./mnemonic.js?v=17";
+import { translateToChinese } from "./translate.js?v=17";
+import * as store from "./storage.js?v=17";
+import * as srs from "./srs.js?v=17";
+import * as quiz from "./quiz.js?v=17";
+import * as cloud from "./cloud-sync.js?v=17";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -28,6 +28,14 @@ function initTabs() {
 
   $("#menu-toggle-btn").addEventListener("click", () => {
     $("#tabs-menu").classList.toggle("open");
+  });
+
+  document.addEventListener("click", (e) => {
+    const menu = $("#tabs-menu");
+    const toggle = $("#menu-toggle-btn");
+    if (!menu.classList.contains("open")) return;
+    if (menu.contains(e.target) || toggle.contains(e.target)) return;
+    menu.classList.remove("open");
   });
 }
 
@@ -453,7 +461,9 @@ function viewWordDetail(word) {
   lastSearchResult = data;
   $("#search-input").value = data.word;
   $("#search-status").textContent = "";
-  $("#search-result").innerHTML = renderWordCard(data, { saved: true });
+  $("#search-result").innerHTML = `
+    <button type="button" class="back-btn" data-action="back-to-list">← 返回單字本</button>
+    ${renderWordCard(data, { saved: true })}`;
 }
 
 // ---------- Bulk import ----------
@@ -1040,6 +1050,7 @@ function initGlobalEvents() {
     if (action === "cal-prev-month") changeCalendarMonth(-1);
     if (action === "cal-next-month") changeCalendarMonth(1);
     if (action === "view-cal-day") viewCalendarDay(target.dataset.date);
+    if (action === "back-to-list") switchTab("list");
     if (action === "search-word") {
       $("#search-input").value = target.dataset.word;
       doSearch(target.dataset.word);
