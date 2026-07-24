@@ -481,12 +481,39 @@ async function runBulkImport() {
 }
 
 // ---------- Review tab ----------
+const DAILY_REVIEW_LIMIT = 15;
+const REVIEW_SESSION_KEY = "review_session_v1";
+
 let reviewQueue = [];
 let reviewIndex = 0;
 let currentQuestion = null;
 
+// Caps today's review to DAILY_REVIEW_LIMIT words, even if more are overdue,
+// so a backlog doesn't dump 50 cards on you at once. Which words count as
+// "today's batch" is pinned to a date-stamped list in localStorage, so
+// re-opening the tab doesn't hand out a fresh 15 on top of ones already
+// reviewed — anything past the cap just waits and surfaces again tomorrow.
+function getTodayReviewQueue(dueWords) {
+  const today = new Date().toISOString().slice(0, 10);
+  let session;
+  try {
+    session = JSON.parse(localStorage.getItem(REVIEW_SESSION_KEY) || "null");
+  } catch {
+    session = null;
+  }
+
+  if (!session || session.date !== today) {
+    session = { date: today, words: dueWords.slice(0, DAILY_REVIEW_LIMIT).map((w) => w.word) };
+    localStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(session));
+  }
+
+  const sessionWords = new Set(session.words);
+  return dueWords.filter((w) => sessionWords.has(w.word));
+}
+
 function buildReviewQueue() {
-  reviewQueue = store.loadWords().filter((w) => srs.isDue(w.srs));
+  const due = store.loadWords().filter((w) => srs.isDue(w.srs));
+  reviewQueue = getTodayReviewQueue(due);
   reviewIndex = 0;
 }
 
@@ -651,7 +678,8 @@ function renderStats() {
 
 // ---------- Badge ----------
 function updateDueBadge() {
-  const dueCount = store.loadWords().filter((w) => srs.isDue(w.srs)).length;
+  const due = store.loadWords().filter((w) => srs.isDue(w.srs));
+  const dueCount = getTodayReviewQueue(due).length;
   const badge = $("#due-badge");
   badge.textContent = dueCount;
   badge.classList.toggle("hidden", dueCount === 0);
