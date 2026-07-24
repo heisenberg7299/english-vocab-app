@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=11";
-import { generateMnemonic } from "./mnemonic.js?v=11";
-import { translateToChinese } from "./translate.js?v=11";
-import * as store from "./storage.js?v=11";
-import * as srs from "./srs.js?v=11";
-import * as quiz from "./quiz.js?v=11";
-import * as cloud from "./cloud-sync.js?v=11";
+} from "./dictionary.js?v=12";
+import { generateMnemonic } from "./mnemonic.js?v=12";
+import { translateToChinese } from "./translate.js?v=12";
+import * as store from "./storage.js?v=12";
+import * as srs from "./srs.js?v=12";
+import * as quiz from "./quiz.js?v=12";
+import * as cloud from "./cloud-sync.js?v=12";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -46,6 +46,11 @@ function switchTab(name) {
 function refreshCurrentTab() {
   if (activeTab === "list") renderWordList();
   if (activeTab === "stats") renderStats();
+  // Self-heal from the "tab opened before Firestore's initial sync landed"
+  // race — but only when there's nothing in progress yet, so this can't
+  // clobber an active question/flipped card like the bug above did.
+  if (activeTab === "review" && reviewQueue.length === 0) renderReview();
+  if (activeTab === "flashcards" && (flashcardHistoryPos < 0 || !store.getWord(flashcardHistory[flashcardHistoryPos]))) renderFlashcards();
   updateDueBadge();
 }
 
@@ -536,7 +541,7 @@ const DAILY_REVIEW_LIMIT = 15;
 // Bump this key's suffix whenever the selection algorithm changes underneath
 // it — otherwise a session pinned under the old logic keeps being reused
 // (same date = same day) instead of being recomputed with the new one.
-const REVIEW_SESSION_KEY = "review_session_v2";
+const REVIEW_SESSION_KEY = "review_session_v3";
 
 let reviewQueue = [];
 let reviewIndex = 0;
@@ -560,6 +565,13 @@ function getTodayReviewQueue(allWords) {
   }
 
   if (!session || session.date !== today) {
+    // No word data yet is not the same as "nothing to review" — right
+    // after login, Firestore's initial sync can still be in flight when
+    // this runs. Don't lock in an empty batch for the whole day just
+    // because we asked too early; leave it unpinned so the next call (once
+    // data has actually loaded) gets a real chance to pick a batch.
+    if (!allWords.length) return [];
+
     const picked = srs.selectDailyWords(allWords.filter((w) => w.srs), DAILY_REVIEW_LIMIT);
     session = { date: today, words: picked.map((w) => w.word) };
     localStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(session));
