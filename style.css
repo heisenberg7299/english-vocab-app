@@ -557,6 +557,7 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
 }
 .quiz-correct { color: #16a34a; }
 .quiz-wrong { color: #dc2626; }
+.quiz-explanation { font-size: 14px; font-weight: 400; color: var(--text); margin-top: 4px; }
 
 .reveal-btn {
   padding: 12px 26px;

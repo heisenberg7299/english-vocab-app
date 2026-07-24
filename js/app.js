@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=17";
-import { generateMnemonic } from "./mnemonic.js?v=17";
-import { translateToChinese } from "./translate.js?v=17";
-import * as store from "./storage.js?v=17";
-import * as srs from "./srs.js?v=17";
-import * as quiz from "./quiz.js?v=17";
-import * as cloud from "./cloud-sync.js?v=17";
+} from "./dictionary.js?v=18";
+import { generateMnemonic } from "./mnemonic.js?v=18";
+import { translateToChinese } from "./translate.js?v=18";
+import * as store from "./storage.js?v=18";
+import * as srs from "./srs.js?v=18";
+import * as quiz from "./quiz.js?v=18";
+import * as cloud from "./cloud-sync.js?v=18";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -782,9 +782,13 @@ function handleQuizAnswer(index) {
   store.recordReviewToday();
   updateDueBadge();
 
+  const firstDefinition = updated.meanings?.[0]?.definitions?.[0]?.definition || "";
+  const explanation = [updated.chineseMeaning, firstDefinition].filter(Boolean).join("　·　");
+
   $("#quiz-feedback").innerHTML = `
     <div class="quiz-result ${correct ? "quiz-correct" : "quiz-wrong"}">
       ${correct ? "✅ 答對了！" : `❌ 答錯了，正確答案：${escapeHtml(currentQuestion.correctAnswer)}`}
+      ${explanation ? `<div class="quiz-explanation">${escapeHtml(explanation)}</div>` : ""}
     </div>
     ${renderWordCard(updated, { showAddButton: false, showFamiliarity: false })}
     <button class="reveal-btn" data-action="next-question">下一題</button>`;
