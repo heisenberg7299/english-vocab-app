@@ -523,8 +523,11 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
 .preview-word-item:last-child { border-bottom: none; }
+.preview-word-item:hover { background: #e5f3f2; }
 .preview-word-text { font-weight: 700; font-size: 15px; min-width: 90px; }
 .preview-word-zh { color: var(--text); }
 .review-word { font-size: 32px; font-weight: 700; margin: 10px 0; }
@@ -767,4 +770,5 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   .cal-badge.cal-added { background: #1c3436; color: #7dd8cc; }
   .cal-badge.cal-review-count { background: #14351f; color: #86efac; }
   .cal-dot { background: #14351f; border-color: #22c55e; }
+  .preview-word-item:hover { background: #1c3436; }
 }

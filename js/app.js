@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=20";
-import { generateMnemonic } from "./mnemonic.js?v=20";
-import { translateToChinese } from "./translate.js?v=20";
-import * as store from "./storage.js?v=20";
-import * as srs from "./srs.js?v=20";
-import * as quiz from "./quiz.js?v=20";
-import * as cloud from "./cloud-sync.js?v=20";
+} from "./dictionary.js?v=21";
+import { generateMnemonic } from "./mnemonic.js?v=21";
+import { translateToChinese } from "./translate.js?v=21";
+import * as store from "./storage.js?v=21";
+import * as srs from "./srs.js?v=21";
+import * as quiz from "./quiz.js?v=21";
+import * as cloud from "./cloud-sync.js?v=21";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -177,6 +177,7 @@ function renderWordCard(data, opts = {}) {
 
 // ---------- Search tab ----------
 let lastSearchResult = null;
+let wordDetailReturnTab = "list";
 
 function initSearch() {
   const form = $("#search-form");
@@ -454,15 +455,17 @@ async function backfillChineseTranslations() {
   renderWordList();
 }
 
-function viewWordDetail(word) {
+function viewWordDetail(word, returnTab = "list") {
   const data = store.getWord(word);
   if (!data) return;
+  wordDetailReturnTab = returnTab;
   switchTab("search");
   lastSearchResult = data;
   $("#search-input").value = data.word;
   $("#search-status").textContent = "";
+  const backLabel = returnTab === "review" ? "← 返回今日複習預告" : "← 返回單字本";
   $("#search-result").innerHTML = `
-    <button type="button" class="back-btn" data-action="back-to-list">← 返回單字本</button>
+    <button type="button" class="back-btn" data-action="back-to-list">${backLabel}</button>
     ${renderWordCard(data, { saved: true })}`;
 }
 
@@ -641,15 +644,52 @@ function isTodayWeeklyReview() {
   }
 }
 
-function buildReviewQueue() {
-  reviewQueue = getTodayReviewQueue(store.loadWords());
-  reviewIndex = 0;
+// How many of today's pinned words have already been graded — persisted so
+// closing the tab or reloading mid-session resumes instead of restarting,
+// and so today's batch can't be replayed from question 1 once it's done.
+function getTodayReviewProgress() {
+  try {
+    const session = JSON.parse(localStorage.getItem(REVIEW_SESSION_KEY) || "null");
+    const today = new Date().toISOString().slice(0, 10);
+    if (session && session.date === today) {
+      return Math.min(session.progress || 0, session.words.length);
+    }
+  } catch {
+    // fall through
+  }
+  return 0;
 }
 
-// Entering the review tab always shows a preview of what's coming up first
-// — the actual question flow only starts once the user clicks through it.
+function saveReviewProgress(progress) {
+  try {
+    const session = JSON.parse(localStorage.getItem(REVIEW_SESSION_KEY) || "null");
+    const today = new Date().toISOString().slice(0, 10);
+    if (session && session.date === today) {
+      session.progress = progress;
+      localStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(session));
+    }
+  } catch {
+    // ignore — worst case progress isn't persisted this time
+  }
+}
+
+function buildReviewQueue() {
+  reviewQueue = getTodayReviewQueue(store.loadWords());
+  reviewIndex = getTodayReviewProgress();
+}
+
+// Entering the review tab shows a preview of what's coming up first — but
+// only the first time today. If today's batch is already in progress (or
+// finished), jump straight back into it instead, so leaving and reopening
+// the tab — or reloading the page — can't be used to replay questions
+// that were already answered today.
 function renderReview() {
   buildReviewQueue();
+  if (reviewQueue.length && reviewIndex > 0) {
+    reviewStarted = true;
+    renderCurrentReviewCard();
+    return;
+  }
   reviewStarted = false;
   renderReviewPreview();
 }
@@ -678,7 +718,7 @@ function renderReviewPreview() {
           .map((w) => {
             const pos = w.meanings?.[0]?.partOfSpeech || "";
             return `
-              <div class="preview-word-item">
+              <div class="preview-word-item" data-action="view" data-word="${escapeHtml(w.word)}" data-return="review">
                 <span class="preview-word-text">${escapeHtml(w.word)}</span>
                 ${pos ? `<span class="pos-label">詞性：${escapeHtml(pos)}</span>` : ""}
                 <span class="preview-word-zh">${escapeHtml(w.chineseMeaning || "（尚無中文翻譯）")}</span>
@@ -698,6 +738,7 @@ function startReviewSession() {
 
 function goToNextReviewCard() {
   reviewIndex += 1;
+  saveReviewProgress(reviewIndex);
   renderCurrentReviewCard();
 }
 
@@ -1042,7 +1083,7 @@ function initGlobalEvents() {
       if (lastSearchResult) doSearch(lastSearchResult.word);
       renderWordList();
     }
-    if (action === "view") viewWordDetail(target.dataset.word);
+    if (action === "view") viewWordDetail(target.dataset.word, target.dataset.return || "list");
     if (action === "play-audio") {
       const audio = new Audio(target.dataset.src);
       audio.play().catch(() => {});
@@ -1054,7 +1095,7 @@ function initGlobalEvents() {
     if (action === "cal-prev-month") changeCalendarMonth(-1);
     if (action === "cal-next-month") changeCalendarMonth(1);
     if (action === "view-cal-day") viewCalendarDay(target.dataset.date);
-    if (action === "back-to-list") switchTab("list");
+    if (action === "back-to-list") switchTab(wordDetailReturnTab);
     if (action === "search-word") {
       $("#search-input").value = target.dataset.word;
       doSearch(target.dataset.word);
