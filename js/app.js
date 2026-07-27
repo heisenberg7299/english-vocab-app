@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=21";
-import { generateMnemonic } from "./mnemonic.js?v=21";
-import { translateToChinese } from "./translate.js?v=21";
-import * as store from "./storage.js?v=21";
-import * as srs from "./srs.js?v=21";
-import * as quiz from "./quiz.js?v=21";
-import * as cloud from "./cloud-sync.js?v=21";
+} from "./dictionary.js?v=22";
+import { generateMnemonic } from "./mnemonic.js?v=22";
+import { translateToChinese } from "./translate.js?v=22";
+import * as store from "./storage.js?v=22";
+import * as srs from "./srs.js?v=22";
+import * as quiz from "./quiz.js?v=22";
+import * as cloud from "./cloud-sync.js?v=22";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -1053,12 +1053,40 @@ function renderStats() {
   const avgRetention = retentions.length
     ? Math.round((retentions.reduce((a, b) => a + b, 0) / retentions.length) * 100)
     : null;
+  const atRisk = retentions.filter((r) => r < 0.5).length;
+
+  const totalReviews = words.reduce((sum, w) => sum + (w.srs?.reviews || 0), 0);
+
+  const weekStart = weekStartDate();
+  const addedThisWeek = words.filter((w) => w.addedDate && w.addedDate >= weekStart).length;
+  const reviewsThisWeek = words.reduce((sum, w) => {
+    const history = w.srs?.reviewHistory || [];
+    return sum + history.filter((h) => h.date >= weekStart).length;
+  }, 0);
+
+  const famCounts = { red: 0, yellow: 0, green: 0, none: 0 };
+  words.forEach((w) => {
+    famCounts[w.familiarity && famCounts[w.familiarity] !== undefined ? w.familiarity : "none"]++;
+  });
 
   $("#stats-area").innerHTML = `
     <div class="stat-tile"><div class="num">${words.length}</div><div class="label">總收藏單字</div></div>
     <div class="stat-tile"><div class="num">${todayBatch}</div><div class="label">今日複習批次</div></div>
     <div class="stat-tile"><div class="num">${streak}</div><div class="label">連續複習天數</div></div>
-    <div class="stat-tile"><div class="num">${avgRetention === null ? "—" : avgRetention + "%"}</div><div class="label">平均記憶保留率</div></div>`;
+    <div class="stat-tile"><div class="num">${avgRetention === null ? "—" : avgRetention + "%"}</div><div class="label">平均記憶保留率</div></div>
+    <div class="stat-tile"><div class="num">${totalReviews}</div><div class="label">累積複習次數</div></div>
+    <div class="stat-tile"><div class="num">${addedThisWeek}</div><div class="label">本週新增單字</div></div>
+    <div class="stat-tile"><div class="num">${reviewsThisWeek}</div><div class="label">本週複習次數</div></div>
+    <div class="stat-tile"><div class="num">${atRisk}</div><div class="label">保留率低於 50% 的單字</div></div>
+    <div class="stat-tile stat-tile-wide">
+      <div class="fam-breakdown">
+        <div class="fam-breakdown-item"><span class="fam-num" style="color:#ef4444">${famCounts.red}</span><span class="label">不熟</span></div>
+        <div class="fam-breakdown-item"><span class="fam-num" style="color:#eab308">${famCounts.yellow}</span><span class="label">普通</span></div>
+        <div class="fam-breakdown-item"><span class="fam-num" style="color:#22c55e">${famCounts.green}</span><span class="label">熟悉</span></div>
+        <div class="fam-breakdown-item"><span class="fam-num" style="color:var(--muted)">${famCounts.none}</span><span class="label">未標記</span></div>
+      </div>
+      <div class="label" style="margin-top:10px;">熟悉度分布</div>
+    </div>`;
 }
 
 // ---------- Badge ----------
