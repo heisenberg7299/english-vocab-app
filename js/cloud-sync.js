@@ -18,8 +18,8 @@ import {
   collection,
   onSnapshot,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js?v=22";
-import * as store from "./storage.js?v=22";
+import { firebaseConfig } from "./firebase-config.js?v=23";
+import * as store from "./storage.js?v=23";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

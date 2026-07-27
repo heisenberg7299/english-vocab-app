@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=22";
-import { generateMnemonic } from "./mnemonic.js?v=22";
-import { translateToChinese } from "./translate.js?v=22";
-import * as store from "./storage.js?v=22";
-import * as srs from "./srs.js?v=22";
-import * as quiz from "./quiz.js?v=22";
-import * as cloud from "./cloud-sync.js?v=22";
+} from "./dictionary.js?v=23";
+import { generateMnemonic } from "./mnemonic.js?v=23";
+import { translateToChinese } from "./translate.js?v=23";
+import * as store from "./storage.js?v=23";
+import * as srs from "./srs.js?v=23";
+import * as quiz from "./quiz.js?v=23";
+import * as cloud from "./cloud-sync.js?v=23";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -43,6 +43,7 @@ function switchTab(name) {
   activeTab = name;
   $$(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   $$(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${name}`));
+  if (name === "search") randomizeSearchPlaceholder();
   if (name === "list") renderWordList();
   if (name === "review") renderReview();
   if (name === "flashcards") renderFlashcards();
@@ -179,7 +180,23 @@ function renderWordCard(data, opts = {}) {
 let lastSearchResult = null;
 let wordDetailReturnTab = "list";
 
+// Rotating placeholder example — picks a fresh GRE-level word each visit
+// to the search tab instead of always showing the same "ubiquitous".
+const PLACEHOLDER_EXAMPLE_WORDS = [
+  "ubiquitous", "ephemeral", "cacophony", "conundrum", "sycophant",
+  "pernicious", "laconic", "voracious", "obfuscate", "panacea",
+  "quixotic", "gregarious", "ineffable", "serendipity", "mellifluous",
+  "surreptitious", "vicissitude", "assiduous", "perfunctory", "capricious",
+  "equanimity", "recalcitrant", "insidious", "ostentatious", "ubiety",
+];
+
+function randomizeSearchPlaceholder() {
+  const word = PLACEHOLDER_EXAMPLE_WORDS[Math.floor(Math.random() * PLACEHOLDER_EXAMPLE_WORDS.length)];
+  $("#search-input").placeholder = `輸入你不會的英文單字，例如 ${word}`;
+}
+
 function initSearch() {
+  randomizeSearchPlaceholder();
   const form = $("#search-form");
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
