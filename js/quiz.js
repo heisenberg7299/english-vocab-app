@@ -76,6 +76,7 @@ export function buildQuestion(word, allWords) {
       type,
       prompt: "根據句意，選出最適合填入空格的單字：",
       sentence: blankOutWord(example, word.word),
+      fullSentence: example,
       options: shuffle([word.word, ...distractors]),
       correctAnswer: word.word,
     };

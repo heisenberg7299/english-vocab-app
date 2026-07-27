@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=24";
-import { generateMnemonic } from "./mnemonic.js?v=24";
-import { translateToChinese } from "./translate.js?v=24";
-import * as store from "./storage.js?v=24";
-import * as srs from "./srs.js?v=24";
-import * as quiz from "./quiz.js?v=24";
-import * as cloud from "./cloud-sync.js?v=24";
+} from "./dictionary.js?v=25";
+import { generateMnemonic } from "./mnemonic.js?v=25";
+import { translateToChinese } from "./translate.js?v=25";
+import * as store from "./storage.js?v=25";
+import * as srs from "./srs.js?v=25";
+import * as quiz from "./quiz.js?v=25";
+import * as cloud from "./cloud-sync.js?v=25";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -827,16 +827,39 @@ function randomFeedbackPhrase(correct) {
   return list[Math.floor(Math.random() * list.length)];
 }
 
-function handleQuizAnswer(index) {
+// Builds an explanation appropriate to how the question was actually
+// asked, not just a generic word definition: a cloze question gets the
+// whole example sentence translated (so the context makes sense), a
+// synonym question spells out why the two words match, and a definition
+// question falls back to the word's own Chinese gloss + definition.
+async function buildQuizExplanation(q, word) {
+  if (q.type === "cloze" && q.fullSentence) {
+    const zhSentence = await translateToChinese(q.fullSentence);
+    if (zhSentence) return `整句翻譯：${zhSentence}`;
+    if (word.chineseMeaning) return `「${word.word}」意思：${word.chineseMeaning}`;
+    return "";
+  }
+
+  if (q.type === "synonym") {
+    const base = `「${word.word}」與「${q.correctAnswer}」互為同義字`;
+    return word.chineseMeaning ? `${base}，都是「${word.chineseMeaning}」的意思` : base;
+  }
+
+  const firstDefinition = word.meanings?.[0]?.definitions?.[0]?.definition || "";
+  return [word.chineseMeaning, firstDefinition].filter(Boolean).join("　·　");
+}
+
+async function handleQuizAnswer(index) {
   if (!currentQuestion || currentQuestion.answered) return;
   currentQuestion.answered = true;
+  const q = currentQuestion;
 
-  const chosen = currentQuestion.options[index];
-  const correct = chosen === currentQuestion.correctAnswer;
+  const chosen = q.options[index];
+  const correct = chosen === q.correctAnswer;
 
   $$(".quiz-option").forEach((btn, i) => {
     btn.disabled = true;
-    if (currentQuestion.options[i] === currentQuestion.correctAnswer) {
+    if (q.options[i] === q.correctAnswer) {
       btn.classList.add("correct");
     } else if (i === index) {
       btn.classList.add("wrong");
@@ -851,17 +874,24 @@ function handleQuizAnswer(index) {
   updateDueBadge();
   checkMilestones();
 
-  const firstDefinition = updated.meanings?.[0]?.definitions?.[0]?.definition || "";
-  const explanation = [updated.chineseMeaning, firstDefinition].filter(Boolean).join("　·　");
   const feedbackPhrase = randomFeedbackPhrase(correct);
 
   $("#quiz-feedback").innerHTML = `
     <div class="quiz-result ${correct ? "quiz-correct" : "quiz-wrong"}">
-      ${correct ? feedbackPhrase : `${feedbackPhrase}，正確答案：${escapeHtml(currentQuestion.correctAnswer)}`}
-      ${explanation ? `<div class="quiz-explanation">${escapeHtml(explanation)}</div>` : ""}
+      ${correct ? feedbackPhrase : `${feedbackPhrase}，正確答案：${escapeHtml(q.correctAnswer)}`}
+      <div class="quiz-explanation" id="quiz-explanation">解釋載入中…</div>
     </div>
     ${renderWordCard(updated, { showAddButton: false, showFamiliarity: false })}
     <button class="reveal-btn" data-action="next-question">下一題</button>`;
+
+  // Fill the explanation in once it resolves — the element may already be
+  // gone if the user moved on to the next question before this settled.
+  const explanation = await buildQuizExplanation(q, updated);
+  const explanationEl = $("#quiz-explanation");
+  if (explanationEl) {
+    if (explanation) explanationEl.textContent = explanation;
+    else explanationEl.remove();
+  }
 }
 
 // Simple flashcard self-grading fallback (used until you've saved at least
