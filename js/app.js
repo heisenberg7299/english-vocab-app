@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=23";
-import { generateMnemonic } from "./mnemonic.js?v=23";
-import { translateToChinese } from "./translate.js?v=23";
-import * as store from "./storage.js?v=23";
-import * as srs from "./srs.js?v=23";
-import * as quiz from "./quiz.js?v=23";
-import * as cloud from "./cloud-sync.js?v=23";
+} from "./dictionary.js?v=24";
+import { generateMnemonic } from "./mnemonic.js?v=24";
+import { translateToChinese } from "./translate.js?v=24";
+import * as store from "./storage.js?v=24";
+import * as srs from "./srs.js?v=24";
+import * as quiz from "./quiz.js?v=24";
+import * as cloud from "./cloud-sync.js?v=24";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -363,6 +363,7 @@ function addWordToList(wordKey) {
 
   saveWordRecord(data);
   updateDueBadge();
+  checkMilestones();
   // refresh whichever card is currently displayed
   doSearch(data.word);
 }
@@ -817,6 +818,15 @@ function renderQuizCard(w, allWords) {
     </div>`;
 }
 
+// A little variety so it's not the same "答對了！" every single time.
+const CORRECT_FEEDBACK_PHRASES = ["✅ 答對了！", "🎉 太強了，就是這個！", "👍 沒錯，記住了！", "✨ 答對，繼續保持！", "🙌 完全正確！"];
+const WRONG_FEEDBACK_PHRASES = ["❌ 答錯了", "😅 差一點，再接再厲", "🤔 不是這個，再想想", "📌 先記一下，下次就會了"];
+
+function randomFeedbackPhrase(correct) {
+  const list = correct ? CORRECT_FEEDBACK_PHRASES : WRONG_FEEDBACK_PHRASES;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 function handleQuizAnswer(index) {
   if (!currentQuestion || currentQuestion.answered) return;
   currentQuestion.answered = true;
@@ -839,13 +849,15 @@ function handleQuizAnswer(index) {
   store.upsertWord(updated);
   store.recordReviewToday();
   updateDueBadge();
+  checkMilestones();
 
   const firstDefinition = updated.meanings?.[0]?.definitions?.[0]?.definition || "";
   const explanation = [updated.chineseMeaning, firstDefinition].filter(Boolean).join("　·　");
+  const feedbackPhrase = randomFeedbackPhrase(correct);
 
   $("#quiz-feedback").innerHTML = `
     <div class="quiz-result ${correct ? "quiz-correct" : "quiz-wrong"}">
-      ${correct ? "✅ 答對了！" : `❌ 答錯了，正確答案：${escapeHtml(currentQuestion.correctAnswer)}`}
+      ${correct ? feedbackPhrase : `${feedbackPhrase}，正確答案：${escapeHtml(currentQuestion.correctAnswer)}`}
       ${explanation ? `<div class="quiz-explanation">${escapeHtml(explanation)}</div>` : ""}
     </div>
     ${renderWordCard(updated, { showAddButton: false, showFamiliarity: false })}
@@ -886,6 +898,7 @@ function gradeCurrentWord(quality) {
   const updated = { ...w, srs: srs.review(w.srs, quality) };
   store.upsertWord(updated);
   store.recordReviewToday();
+  checkMilestones();
   goToNextReviewCard();
 }
 
@@ -1104,6 +1117,63 @@ function renderStats() {
       </div>
       <div class="label" style="margin-top:10px;">熟悉度分布</div>
     </div>`;
+}
+
+// ---------- Milestones ----------
+// Small celebratory toasts for streak / word-count / review-count
+// thresholds — purely for fun, doesn't feed back into the SRS model.
+// Each milestone key is recorded once shown so it never repeats.
+const MILESTONES_SHOWN_KEY = "milestones_shown_v1";
+const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 200, 365];
+const WORD_COUNT_MILESTONES = [10, 25, 50, 100, 200, 500, 1000];
+const REVIEW_COUNT_MILESTONES = [50, 100, 250, 500, 1000, 2500];
+
+function getShownMilestones() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(MILESTONES_SHOWN_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function markMilestoneShown(key) {
+  const shown = getShownMilestones();
+  shown.add(key);
+  localStorage.setItem(MILESTONES_SHOWN_KEY, JSON.stringify([...shown]));
+}
+
+function showMilestoneToast(text) {
+  const toast = document.createElement("div");
+  toast.className = "milestone-toast";
+  toast.textContent = text;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 400);
+  }, 3800);
+}
+
+// Only ever shows one toast per call, even if multiple thresholds were
+// crossed at once (e.g. reopening the app after a few days away) — the
+// rest surface on the next call instead of stacking up.
+function checkMilestones() {
+  const shown = getShownMilestones();
+  const words = store.loadWords();
+  const streak = store.getStreak();
+  const totalReviews = words.reduce((sum, w) => sum + (w.srs?.reviews || 0), 0);
+
+  const candidates = [
+    ...STREAK_MILESTONES.filter((m) => streak >= m).map((m) => ({ key: `streak-${m}`, text: `🔥 連續複習 ${m} 天了，太猛了！` })),
+    ...WORD_COUNT_MILESTONES.filter((m) => words.length >= m).map((m) => ({ key: `words-${m}`, text: `📚 單字本累積到 ${m} 個單字了！` })),
+    ...REVIEW_COUNT_MILESTONES.filter((m) => totalReviews >= m).map((m) => ({ key: `reviews-${m}`, text: `🎯 累積複習次數達到 ${m} 次！` })),
+  ];
+
+  const next = candidates.find((c) => !shown.has(c.key));
+  if (next) {
+    showMilestoneToast(next.text);
+    markMilestoneShown(next.key);
+  }
 }
 
 // ---------- Badge ----------

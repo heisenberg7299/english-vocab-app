@@ -735,6 +735,27 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
 .fam-breakdown-item .fam-num { font-size: 24px; font-weight: 700; }
 .fam-breakdown-item .label { font-size: 12px; color: var(--muted); margin-top: 0; }
 
+.milestone-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translate(-50%, 16px);
+  background: var(--primary-gradient);
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 100;
+  max-width: min(90vw, 420px);
+  text-align: center;
+  pointer-events: none;
+}
+.milestone-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0e1a1a;
