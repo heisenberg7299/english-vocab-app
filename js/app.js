@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=27";
-import { generateMnemonic } from "./mnemonic.js?v=27";
-import { translateToChinese } from "./translate.js?v=27";
-import * as store from "./storage.js?v=27";
-import * as srs from "./srs.js?v=27";
-import * as quiz from "./quiz.js?v=27";
-import * as cloud from "./cloud-sync.js?v=27";
+} from "./dictionary.js?v=28";
+import { generateMnemonic } from "./mnemonic.js?v=28";
+import { translateToChinese } from "./translate.js?v=28";
+import * as store from "./storage.js?v=28";
+import * as srs from "./srs.js?v=28";
+import * as quiz from "./quiz.js?v=28";
+import * as cloud from "./cloud-sync.js?v=28";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -132,7 +132,7 @@ function renderWordCard(data, opts = {}) {
   const chineseHtml = data.chineseMeaning
     ? `<div class="chinese-meaning"><span class="def-label">中文意思</span> ${escapeHtml(data.chineseMeaning)}<span class="mt-note">（機器翻譯，僅供參考）</span></div>`
     : saved
-    ? `<button class="translate-btn" data-action="translate" data-word="${escapeHtml(data.word)}">🌐 翻譯成中文</button>`
+    ? `<button class="translate-btn" data-action="translate" data-word="${escapeHtml(data.word)}">翻譯成中文</button>`
     : "";
 
   const familiarityHtml =
