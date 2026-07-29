@@ -25,8 +25,20 @@ function firstDefinition(word) {
   return "";
 }
 
+// Builds a regex matching `word` in a sentence, allowing for inflection.
+// For a single word this just permits a trailing suffix (avoid -> avoids).
+// For a phrase, only the first token gets that treatment (kick the bucket
+// -> kicked/kicking the bucket) since that's where idioms actually inflect
+// — the rest of the phrase has to match literally, joined by \s+ so any
+// whitespace variation in the source sentence still lines up.
+function buildWordRegex(word) {
+  const tokens = word.trim().split(/\s+/).map(escapeRegex);
+  const pattern = tokens.map((t, i) => (i === 0 ? `${t}\\w*` : t)).join("\\s+");
+  return new RegExp(`\\b${pattern}\\b`, "i");
+}
+
 function findExampleSentence(word) {
-  const wordRe = new RegExp(`\\b${escapeRegex(word.word)}\\w*\\b`, "i");
+  const wordRe = buildWordRegex(word.word);
   for (const m of word.meanings || []) {
     for (const d of m.definitions || []) {
       if (d.example && wordRe.test(d.example)) return d.example;
@@ -36,8 +48,7 @@ function findExampleSentence(word) {
 }
 
 function blankOutWord(sentence, word) {
-  const wordRe = new RegExp(`\\b${escapeRegex(word)}\\w*\\b`, "i");
-  return sentence.replace(wordRe, "＿＿＿＿＿");
+  return sentence.replace(buildWordRegex(word), "＿＿＿＿＿");
 }
 
 function pickDistractorWords(word, allWords, count) {

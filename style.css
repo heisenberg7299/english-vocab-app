@@ -244,6 +244,15 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   padding: 2px 8px;
   border-radius: 999px;
 }
+.phrase-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent2);
+  background: #e5f3f2;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
 
 .chinese-meaning {
   margin-top: 8px;
@@ -786,6 +795,7 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
   .list-toolbar button { background: #17262a; color: #5eead4; }
   .import-panel textarea { background: #0e1a1a; color: var(--text); border-color: var(--border); }
   .source-badge { background: #1f3336; }
+  .phrase-badge { background: #1c3436; color: #7dd8cc; }
   .suggestion-chip { background: #1c3436; color: #7dd8cc; border-color: var(--border); }
   .manual-toggle-btn { background: #17262a; color: var(--text); border-color: var(--border); }
   .manual-form input,

@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=29";
-import { generateMnemonic } from "./mnemonic.js?v=29";
-import { translateToChinese } from "./translate.js?v=29";
-import * as store from "./storage.js?v=29";
-import * as srs from "./srs.js?v=29";
-import * as quiz from "./quiz.js?v=29";
-import * as cloud from "./cloud-sync.js?v=29";
+} from "./dictionary.js?v=30";
+import { generateMnemonic } from "./mnemonic.js?v=30";
+import { translateToChinese } from "./translate.js?v=30";
+import * as store from "./storage.js?v=30";
+import * as srs from "./srs.js?v=30";
+import * as quiz from "./quiz.js?v=30";
+import * as cloud from "./cloud-sync.js?v=30";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -78,6 +78,13 @@ function escapeHtml(str = "") {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
+
+// Nothing in the lookup/save/quiz pipeline actually requires a single
+// token — the dictionary lookups, Datamuse fallback, manual entry, and
+// bulk import (which only splits on commas/顿號/newlines, never spaces)
+// all already work fine on a full phrase. This just flags multi-word
+// entries visually so it's clear phrases are supported.
+const isPhrase = (word) => word.trim().includes(" ");
 
 const FAMILIARITY_LEVELS = [
   ["red", "不熟"],
@@ -160,6 +167,7 @@ function renderWordCard(data, opts = {}) {
     <div class="card" data-word-card="${escapeHtml(data.word)}">
       <div class="word-head">
         <h2>${escapeHtml(data.word)}</h2>
+        ${isPhrase(data.word) ? `<span class="phrase-badge">片語</span>` : ""}
         ${data.phonetic ? `<span class="phonetic">${escapeHtml(data.phonetic)}</span>` : ""}
         ${data.audio ? `<button class="audio-btn" data-action="play-audio" data-src="${escapeHtml(data.audio)}">🔊</button>` : ""}
         ${sourceLabel}
@@ -180,19 +188,21 @@ function renderWordCard(data, opts = {}) {
 let lastSearchResult = null;
 let wordDetailReturnTab = "list";
 
-// Rotating placeholder example — picks a fresh GRE-level word each visit
-// to the search tab instead of always showing the same "ubiquitous".
+// Rotating placeholder example — picks a fresh GRE-level word (and
+// occasionally a phrase/idiom, to signal those work too) each visit to
+// the search tab instead of always showing the same "ubiquitous".
 const PLACEHOLDER_EXAMPLE_WORDS = [
   "ubiquitous", "ephemeral", "cacophony", "conundrum", "sycophant",
   "pernicious", "laconic", "voracious", "obfuscate", "panacea",
   "quixotic", "gregarious", "ineffable", "serendipity", "mellifluous",
   "surreptitious", "vicissitude", "assiduous", "perfunctory", "capricious",
   "equanimity", "recalcitrant", "insidious", "ostentatious", "ubiety",
+  "kick the bucket", "beat around the bush", "break the ice", "once in a blue moon",
 ];
 
 function randomizeSearchPlaceholder() {
   const word = PLACEHOLDER_EXAMPLE_WORDS[Math.floor(Math.random() * PLACEHOLDER_EXAMPLE_WORDS.length)];
-  $("#search-input").placeholder = `輸入你不會的英文單字，例如 ${word}`;
+  $("#search-input").placeholder = `輸入你不會的英文單字或片語，例如 ${word}`;
 }
 
 function initSearch() {
@@ -411,6 +421,7 @@ function renderWordList() {
         <div class="word-chip ${famClass}" data-action="view" data-word="${escapeHtml(w.word)}">
           <div class="fam-dots">${dotsHtml}</div>
           <h3>${escapeHtml(w.word)}</h3>
+          ${isPhrase(w.word) ? `<span class="phrase-badge">片語</span>` : ""}
           ${w.chineseMeaning ? `<div class="chip-zh">${escapeHtml(w.chineseMeaning)}</div>` : ""}
           <div class="meta ${lowRetention ? "due-today" : ""}">記憶保留率 ${retentionPct ?? "—"}% · 已複習 ${w.srs?.reviews || 0} 次</div>
         </div>`;
