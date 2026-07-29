@@ -17,6 +17,46 @@ const DATAMUSE_POS = {
 
 export class WordNotFoundError extends Error {}
 
+// Dictionary sources only store phrases/idioms in their base (lemma) form
+// — "beat around the bush", never "beating around the bush" — so an exact
+// -match lookup on a conjugated phrase fails even though the idiom itself
+// is well-documented. This covers the common regular -ing/-ed/-s endings
+// with de-doubling ("running" -> "run") and silent-e reinsertion
+// ("making" -> "make") heuristics. Irregular verbs (bite -> bit, break ->
+// broke) aren't recoverable this way and still need manual entry.
+function deinflectCandidates(word) {
+  const w = word.toLowerCase();
+  const candidates = new Set();
+
+  if (w.endsWith("ing") && w.length > 4) {
+    const stem = w.slice(0, -3);
+    candidates.add(stem);
+    if (/([^aeiou])\1$/.test(stem)) candidates.add(stem.slice(0, -1));
+    candidates.add(stem + "e");
+  }
+  if (w.endsWith("ed") && w.length > 3) {
+    const stem = w.slice(0, -2);
+    candidates.add(stem);
+    candidates.add(stem + "e");
+    if (/([^aeiou])\1$/.test(stem)) candidates.add(stem.slice(0, -1));
+  }
+  if (w.endsWith("es") && w.length > 3) candidates.add(w.slice(0, -2));
+  if (w.endsWith("s") && !w.endsWith("ss") && w.length > 2) candidates.add(w.slice(0, -1));
+
+  return [...candidates];
+}
+
+// Only the phrase's first word gets de-inflected (that's where idioms
+// actually conjugate — "kicked the bucket", "beating around the bush");
+// the rest of the phrase is kept as typed. Single words return no
+// candidates, since those already go through the normal exact-match path.
+export function phraseDeinflectionAttempts(phrase) {
+  const tokens = phrase.trim().split(/\s+/);
+  if (tokens.length < 2) return [];
+  const [first, ...rest] = tokens;
+  return deinflectCandidates(first).map((c) => [c, ...rest].join(" "));
+}
+
 export async function lookupWord(word) {
   const clean = word.trim().toLowerCase();
   if (!clean) throw new Error("請輸入單字");

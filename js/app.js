@@ -3,14 +3,15 @@ import {
   lookupWordFallback,
   fetchSimilarWords,
   buildManualWordData,
+  phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=30";
-import { generateMnemonic } from "./mnemonic.js?v=30";
-import { translateToChinese } from "./translate.js?v=30";
-import * as store from "./storage.js?v=30";
-import * as srs from "./srs.js?v=30";
-import * as quiz from "./quiz.js?v=30";
-import * as cloud from "./cloud-sync.js?v=30";
+} from "./dictionary.js?v=31";
+import { generateMnemonic } from "./mnemonic.js?v=31";
+import { translateToChinese } from "./translate.js?v=31";
+import * as store from "./storage.js?v=31";
+import * as srs from "./srs.js?v=31";
+import * as quiz from "./quiz.js?v=31";
+import * as cloud from "./cloud-sync.js?v=31";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -272,6 +273,17 @@ function renderSearchResult(data) {
 
 // Primary dictionary has nothing: try the Datamuse fallback definition, and
 // if that's empty too, offer spelling suggestions plus a manual-entry form.
+// Tries both dictionary sources for one query string; returns the raw
+// (not-yet-translated) word data, or null if neither has it.
+async function lookupBothSources(word) {
+  try {
+    return await lookupWord(word);
+  } catch (err) {
+    if (!(err instanceof WordNotFoundError)) throw err;
+  }
+  return await lookupWordFallback(word);
+}
+
 async function handleWordNotFound(word) {
   const status = $("#search-status");
   status.textContent = "主要字典查無此字，嘗試備援來源...";
@@ -283,6 +295,27 @@ async function handleWordNotFound(word) {
     status.textContent = "";
     renderSearchResult(withZh);
     return;
+  }
+
+  // Dictionaries only store phrases in their base form ("beat around the
+  // bush"), so a conjugated phrase ("beating around the bush") fails an
+  // exact match even though the idiom itself is well documented — retry
+  // with the phrase's first word de-inflected before giving up.
+  for (const candidate of phraseDeinflectionAttempts(word)) {
+    let data = null;
+    try {
+      data = await lookupBothSources(candidate);
+    } catch {
+      // network hiccup on this candidate — just move on to the next one
+    }
+    if (data) {
+      const withZh = await attachChineseMeaning(data);
+      lastSearchResult = withZh;
+      status.textContent = `找不到「${word.trim().toLowerCase()}」，已自動改用基本型「${candidate}」查詢`;
+      status.classList.remove("error");
+      renderSearchResult(withZh);
+      return;
+    }
   }
 
   const clean = word.trim().toLowerCase();
