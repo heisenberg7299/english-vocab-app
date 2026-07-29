@@ -22,8 +22,13 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
 
+  // cache: "no-store" here is load-bearing — without it this "network-first"
+  // fetch still quietly resolves from the browser's own HTTP cache (GitHub
+  // Pages sends Cache-Control: max-age=600 on index.html, which has no ?v=
+  // busting since it's the entry file itself), so a deploy could sit
+  // invisible for up to 10 minutes even though this handler ran fresh.
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-store" })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
