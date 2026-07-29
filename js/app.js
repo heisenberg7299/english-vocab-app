@@ -1,17 +1,18 @@
 import {
   lookupWord,
   lookupWordFallback,
+  lookupWordWiktionary,
   fetchSimilarWords,
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=31";
-import { generateMnemonic } from "./mnemonic.js?v=31";
-import { translateToChinese } from "./translate.js?v=31";
-import * as store from "./storage.js?v=31";
-import * as srs from "./srs.js?v=31";
-import * as quiz from "./quiz.js?v=31";
-import * as cloud from "./cloud-sync.js?v=31";
+} from "./dictionary.js?v=32";
+import { generateMnemonic } from "./mnemonic.js?v=32";
+import { translateToChinese } from "./translate.js?v=32";
+import * as store from "./storage.js?v=32";
+import * as srs from "./srs.js?v=32";
+import * as quiz from "./quiz.js?v=32";
+import * as cloud from "./cloud-sync.js?v=32";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -133,6 +134,8 @@ function renderWordCard(data, opts = {}) {
   const sourceLabel =
     data.source === "datamuse"
       ? `<span class="source-badge">來源：備援字典（Wiktionary）</span>`
+      : data.source === "wiktionary"
+      ? `<span class="source-badge">來源：維基詞典</span>`
       : data.source === "manual"
       ? `<span class="source-badge">來源：自行輸入</span>`
       : "";
@@ -271,19 +274,22 @@ function renderSearchResult(data) {
   $("#search-result").innerHTML = renderWordCard(data, { saved });
 }
 
-// Primary dictionary has nothing: try the Datamuse fallback definition, and
-// if that's empty too, offer spelling suggestions plus a manual-entry form.
-// Tries both dictionary sources for one query string; returns the raw
-// (not-yet-translated) word data, or null if neither has it.
-async function lookupBothSources(word) {
+// Tries all three dictionary sources in order for one query string;
+// returns the raw (not-yet-translated) word data, or null if none have it.
+async function lookupAllSources(word) {
   try {
     return await lookupWord(word);
   } catch (err) {
     if (!(err instanceof WordNotFoundError)) throw err;
   }
-  return await lookupWordFallback(word);
+  const fromDatamuse = await lookupWordFallback(word);
+  if (fromDatamuse) return fromDatamuse;
+  return await lookupWordWiktionary(word);
 }
 
+// Primary dictionary has nothing: try Datamuse, then Wiktionary directly
+// (broader phrase coverage than Datamuse's own older Wiktionary snapshot),
+// then a de-inflected retry, and only then offer manual entry.
 async function handleWordNotFound(word) {
   const status = $("#search-status");
   status.textContent = "主要字典查無此字，嘗試備援來源...";
@@ -297,6 +303,15 @@ async function handleWordNotFound(word) {
     return;
   }
 
+  const wiktionary = await lookupWordWiktionary(word);
+  if (wiktionary) {
+    const withZh = await attachChineseMeaning(wiktionary);
+    lastSearchResult = withZh;
+    status.textContent = "";
+    renderSearchResult(withZh);
+    return;
+  }
+
   // Dictionaries only store phrases in their base form ("beat around the
   // bush"), so a conjugated phrase ("beating around the bush") fails an
   // exact match even though the idiom itself is well documented — retry
@@ -304,7 +319,7 @@ async function handleWordNotFound(word) {
   for (const candidate of phraseDeinflectionAttempts(word)) {
     let data = null;
     try {
-      data = await lookupBothSources(candidate);
+      data = await lookupAllSources(candidate);
     } catch {
       // network hiccup on this candidate — just move on to the next one
     }
@@ -599,19 +614,30 @@ async function runBulkImport() {
     if (store.getWord(word)) {
       skipped.push(word);
     } else {
+      let data = null;
       try {
-        const data = await attachChineseMeaning(await lookupWord(word));
-        saveWordRecord(data);
-        added.push(data.word);
+        data = await lookupAllSources(word);
       } catch {
-        // primary dictionary doesn't have it — try the fallback before giving up
-        const fallback = await lookupWordFallback(word);
-        if (fallback) {
-          saveWordRecord(await attachChineseMeaning(fallback));
-          added.push(fallback.word);
-        } else {
-          failed.push(word);
+        data = null;
+      }
+      if (!data) {
+        // same de-inflection retry as single-word search, so a phrase
+        // pasted in its conjugated form ("kicked the bucket") still lands
+        for (const candidate of phraseDeinflectionAttempts(word)) {
+          try {
+            data = await lookupAllSources(candidate);
+          } catch {
+            data = null;
+          }
+          if (data) break;
         }
+      }
+      if (data) {
+        const withZh = await attachChineseMeaning(data);
+        saveWordRecord(withZh);
+        added.push(withZh.word);
+      } else {
+        failed.push(word);
       }
     }
 

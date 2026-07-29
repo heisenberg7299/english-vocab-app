@@ -176,6 +176,85 @@ export async function lookupWordFallback(word) {
   };
 }
 
+// Third fallback, tried after both the primary dictionary and Datamuse
+// come up empty: Wiktionary itself, via MediaWiki's API (CORS-enabled
+// through origin=*). The response is rendered HTML, not structured JSON
+// like the other two sources, so this parses it with DOMParser — and
+// noticeably widens phrase/idiom coverage beyond Datamuse's own (older,
+// partial) Wiktionary snapshot; confirmed "rally behind" only shows up
+// through this path, not the other two.
+const WIKTIONARY_BASE = "https://en.wiktionary.org/w/api.php";
+const WIKTIONARY_POS = new Set([
+  "noun", "verb", "adjective", "adverb", "pronoun", "preposition",
+  "conjunction", "interjection", "phrase", "idiom", "proverb",
+  "prepositional phrase", "determiner", "numeral", "particle",
+]);
+
+export async function lookupWordWiktionary(word) {
+  const clean = word.trim().toLowerCase();
+  let page;
+  try {
+    const res = await fetch(
+      `${WIKTIONARY_BASE}?action=query&titles=${encodeURIComponent(clean)}&prop=extracts&format=json&origin=*`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    page = Object.values(data.query.pages || {})[0];
+  } catch {
+    return null;
+  }
+  if (!page || page.missing !== undefined || !page.extract) return null;
+
+  const doc = new DOMParser().parseFromString(page.extract, "text/html");
+  const englishH2 = [...doc.querySelectorAll("h2")].find(
+    (h) => h.textContent.trim() === "English"
+  );
+  if (!englishH2) return null;
+
+  const meanings = [];
+  let node = englishH2.nextElementSibling;
+  while (node && node.tagName !== "H2") {
+    if (node.tagName === "H3" && WIKTIONARY_POS.has(node.textContent.trim().toLowerCase())) {
+      const partOfSpeech = node.textContent.trim().toLowerCase();
+      // walk forward to the definitions <ol> (headword line sits in
+      // between), stopping early if another heading turns up first
+      let sib = node.nextElementSibling;
+      let ol = null;
+      while (sib && sib.tagName !== "H2" && sib.tagName !== "H3") {
+        if (sib.tagName === "OL") { ol = sib; break; }
+        sib = sib.nextElementSibling;
+      }
+      if (ol) {
+        const definitions = [];
+        for (const li of ol.children) {
+          if (li.tagName !== "LI") continue;
+          const clone = li.cloneNode(true);
+          // strip nested synonym notes (<dl>) and quotation blocks (<ul>)
+          // so the definition text itself doesn't get diluted
+          clone.querySelectorAll("dl, ul").forEach((el) => el.remove());
+          const text = clone.textContent.replace(/\s+/g, " ").trim();
+          if (text) definitions.push({ definition: text, example: "", synonyms: [], antonyms: [] });
+          if (definitions.length >= 3) break;
+        }
+        if (definitions.length) meanings.push({ partOfSpeech, definitions });
+      }
+    }
+    node = node.nextElementSibling;
+  }
+
+  if (!meanings.length) return null;
+
+  return {
+    word: clean,
+    phonetic: "",
+    audio: "",
+    meanings,
+    synonyms: [],
+    antonyms: [],
+    source: "wiktionary",
+  };
+}
+
 // Similarly-spelled words for a "did you mean" list when nothing matched.
 export async function fetchSimilarWords(word) {
   const clean = word.trim().toLowerCase();

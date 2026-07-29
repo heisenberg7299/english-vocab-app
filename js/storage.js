@@ -76,6 +76,16 @@ export function replaceStats(stats) {
   localStorage.setItem(STATS_KEY, JSON.stringify(statsCache));
 }
 
+// Wipes the local cache — used on logout, since without this the last
+// signed-in account's word list and stats just sit in localStorage and
+// stay visible to whoever uses this browser next, logged in or not.
+export function clearAll() {
+  wordsCache = [];
+  statsCache = { reviewedDates: [] };
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STATS_KEY);
+}
+
 export function recordReviewToday(opts = {}) {
   const today = new Date().toISOString().slice(0, 10);
   if (!statsCache.reviewedDates.includes(today)) {

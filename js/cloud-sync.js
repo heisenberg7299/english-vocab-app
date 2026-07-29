@@ -18,8 +18,8 @@ import {
   collection,
   onSnapshot,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js?v=31";
-import * as store from "./storage.js?v=31";
+import { firebaseConfig } from "./firebase-config.js?v=32";
+import * as store from "./storage.js?v=32";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -37,6 +37,10 @@ export function logIn(email, password) {
 }
 export function logOut() {
   stopSync();
+  // Without this, the account's word list and stats just stay in
+  // localStorage after logout — still visible to whoever uses this
+  // browser next, logged in or not.
+  store.clearAll();
   return signOut(auth);
 }
 
