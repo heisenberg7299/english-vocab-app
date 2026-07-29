@@ -4,13 +4,13 @@ import {
   fetchSimilarWords,
   buildManualWordData,
   WordNotFoundError,
-} from "./dictionary.js?v=25";
-import { generateMnemonic } from "./mnemonic.js?v=25";
-import { translateToChinese } from "./translate.js?v=25";
-import * as store from "./storage.js?v=25";
-import * as srs from "./srs.js?v=25";
-import * as quiz from "./quiz.js?v=25";
-import * as cloud from "./cloud-sync.js?v=25";
+} from "./dictionary.js?v=26";
+import { generateMnemonic } from "./mnemonic.js?v=26";
+import { translateToChinese } from "./translate.js?v=26";
+import * as store from "./storage.js?v=26";
+import * as srs from "./srs.js?v=26";
+import * as quiz from "./quiz.js?v=26";
+import * as cloud from "./cloud-sync.js?v=26";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -207,10 +207,28 @@ function initSearch() {
   });
 }
 
+function firstDefinitionText(data) {
+  for (const m of data.meanings || []) {
+    for (const d of m.definitions || []) {
+      if (d.definition) return d.definition;
+    }
+  }
+  return "";
+}
+
 // Best-effort Chinese gloss; silently omitted if the translation API has
 // nothing (attachChineseMeaning never throws, see translateToChinese).
+// MyMemory just echoes obscure GRE words back untranslated rather than
+// erroring (sycophant, mellifluous, vicissitude, ubiety all do this) —
+// translateToChinese already filters those no-op echoes out, so falling
+// back to translating the definition instead catches real Chinese text
+// for words it doesn't have a direct translation for.
 async function attachChineseMeaning(data) {
-  const chineseMeaning = await translateToChinese(data.word);
+  let chineseMeaning = await translateToChinese(data.word);
+  if (!chineseMeaning) {
+    const def = firstDefinitionText(data);
+    if (def) chineseMeaning = await translateToChinese(def);
+  }
   return chineseMeaning ? { ...data, chineseMeaning } : data;
 }
 
@@ -459,7 +477,11 @@ async function backfillChineseTranslations() {
 
   for (const w of targets) {
     status.textContent = `補上中文中... ${done + 1} / ${targets.length}`;
-    const chineseMeaning = await translateToChinese(w.word);
+    let chineseMeaning = await translateToChinese(w.word);
+    if (!chineseMeaning) {
+      const def = firstDefinitionText(w);
+      if (def) chineseMeaning = await translateToChinese(def);
+    }
     if (chineseMeaning) {
       store.upsertWord({ ...w, chineseMeaning });
       filled += 1;
@@ -757,6 +779,7 @@ function startReviewSession() {
 function goToNextReviewCard() {
   reviewIndex += 1;
   saveReviewProgress(reviewIndex);
+  updateDueBadge();
   renderCurrentReviewCard();
 }
 
@@ -1207,11 +1230,14 @@ function checkMilestones() {
 }
 
 // ---------- Badge ----------
+// Remaining count in today's pinned batch, not the batch's total size —
+// otherwise this stayed at (e.g.) 15 even after finishing all of them.
 function updateDueBadge() {
-  const dueCount = getTodayReviewQueue(store.loadWords()).length;
+  const queueLength = getTodayReviewQueue(store.loadWords()).length;
+  const remaining = Math.max(0, queueLength - getTodayReviewProgress());
   const badge = $("#due-badge");
-  badge.textContent = dueCount;
-  badge.classList.toggle("hidden", dueCount === 0);
+  badge.textContent = remaining;
+  badge.classList.toggle("hidden", remaining === 0);
 }
 
 // ---------- Global event delegation ----------
