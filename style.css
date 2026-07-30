@@ -781,6 +781,29 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
 .chart-legend-item { display: flex; align-items: center; gap: 5px; }
 .chart-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
+.achv-group { margin-bottom: 24px; }
+.achv-group h3 { font-size: 15px; margin: 0 0 12px; color: var(--text); }
+.achv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+}
+.achv-badge {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 14px 8px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  border: 2px solid transparent;
+  transition: transform 0.15s ease;
+}
+.achv-badge.achv-unlocked { border-color: var(--accent); }
+.achv-badge.achv-locked { opacity: 0.45; }
+.achv-badge:hover { transform: translateY(-2px); }
+.achv-icon { font-size: 26px; margin-bottom: 6px; }
+.achv-num { font-size: 12px; font-weight: 600; color: var(--muted); }
+.achv-badge.achv-unlocked .achv-num { color: var(--accent); }
+
 .milestone-toast {
   position: fixed;
   bottom: 24px;

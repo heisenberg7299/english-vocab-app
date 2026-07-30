@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=38";
-import { generateMnemonic } from "./mnemonic.js?v=38";
-import { translateToChinese } from "./translate.js?v=38";
-import * as store from "./storage.js?v=38";
-import * as srs from "./srs.js?v=38";
-import * as quiz from "./quiz.js?v=38";
-import * as cloud from "./cloud-sync.js?v=38";
+} from "./dictionary.js?v=39";
+import { generateMnemonic } from "./mnemonic.js?v=39";
+import { translateToChinese } from "./translate.js?v=39";
+import * as store from "./storage.js?v=39";
+import * as srs from "./srs.js?v=39";
+import * as quiz from "./quiz.js?v=39";
+import * as cloud from "./cloud-sync.js?v=39";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -52,6 +52,7 @@ function switchTab(name) {
   if (name === "flashcards") renderFlashcards();
   if (name === "calendar") renderCalendar();
   if (name === "stats") renderStats();
+  if (name === "achievements") renderAchievements();
 }
 
 // Re-renders whichever tab is currently visible — used when data changes
@@ -67,6 +68,7 @@ function refreshCurrentTab() {
   if (activeTab === "list") renderWordList();
   if (activeTab === "stats") renderStats();
   if (activeTab === "calendar") renderCalendar();
+  if (activeTab === "achievements") renderAchievements();
   // Self-heal from the "tab opened before Firestore's initial sync landed"
   // race — but only when there's nothing in progress yet, so this can't
   // clobber an active question/flipped card like the bug above did.
@@ -1556,6 +1558,51 @@ function checkMilestones() {
     showMilestoneToast(next.text);
     markMilestoneShown(next.key);
   }
+}
+
+// ---------- Achievements tab ----------
+// Unlock status is computed live from current stats, not from
+// getShownMilestones() — that set only tracks "has the toast fired yet"
+// (deliberately throttled to one at a time), which would make a returning
+// user's already-passed milestones look locked here just because the
+// celebratory toast for them hasn't caught up yet. This page always
+// reflects the true current state.
+function renderAchievements() {
+  const words = store.loadWords();
+  const streak = store.getStreak();
+  const totalReviews = words.reduce((sum, w) => sum + (w.srs?.reviews || 0), 0);
+
+  const groups = [
+    { icon: "🔥", label: "連續複習天數", current: streak, unit: "天", thresholds: STREAK_MILESTONES },
+    { icon: "📚", label: "單字本累積數量", current: words.length, unit: "個", thresholds: WORD_COUNT_MILESTONES },
+    { icon: "🎯", label: "累積複習次數", current: totalReviews, unit: "次", thresholds: REVIEW_COUNT_MILESTONES },
+  ];
+
+  const unlockedCount = groups.reduce((sum, g) => sum + g.thresholds.filter((t) => g.current >= t).length, 0);
+  const totalCount = groups.reduce((sum, g) => sum + g.thresholds.length, 0);
+
+  $("#achievements-area").innerHTML = `
+    <p class="status">已解鎖 ${unlockedCount} / ${totalCount} 個成就</p>
+    ${groups
+      .map(
+        (g) => `
+      <div class="achv-group">
+        <h3>${g.icon} ${escapeHtml(g.label)}（目前：${g.current}${g.unit}）</h3>
+        <div class="achv-grid">
+          ${g.thresholds
+            .map((t) => {
+              const unlocked = g.current >= t;
+              return `
+                <div class="achv-badge ${unlocked ? "achv-unlocked" : "achv-locked"}">
+                  <div class="achv-icon">${unlocked ? g.icon : "🔒"}</div>
+                  <div class="achv-num">${t}${g.unit}</div>
+                </div>`;
+            })
+            .join("")}
+        </div>
+      </div>`
+      )
+      .join("")}`;
 }
 
 // ---------- Badge ----------
