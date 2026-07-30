@@ -16,6 +16,38 @@ A personal English (GRE-level) vocabulary trainer. Look up words or phrases and 
 - **Cloud sync** — log in and your word list syncs to Firestore, so any device signed into the same account sees the same data
 - **PWA** — installable to a phone home screen or desktop as a standalone app
 
+## The scheduling algorithm
+
+The core of this app isn't the dictionary lookup — plenty of tools do that. It's how it decides what to review each day.
+
+Most spaced-repetition apps (Anki, SM-2, etc.) give each card a fixed due date, and the deck just gets more overdue the longer you skip it. This app doesn't have due dates at all. Every word gets a **priority score** computed fresh each day, and the top 15 across the whole library get reviewed — so it degrades gracefully no matter how big the library gets, instead of piling up a backlog.
+
+For each word `i`, the app tracks:
+
+- `S_i` — memory stability (grows with successful reviews, shrinks on mistakes)
+- `D_i` — difficulty, 0–1
+- `t_i` — days since last review
+- `L_i` — number of past lapses (wrong answers)
+- `N_i` — total number of reviews
+
+**Predicted retention** right now, from an Ebbinghaus-style exponential forgetting curve:
+
+```
+R_i = 2^(-t_i / S_i)
+```
+
+**Priority score** — how urgently it's worth reviewing, combining forgetting risk, difficulty, lapse history, and a small bonus for under-reviewed words so nothing gets starved forever:
+
+```
+P_i = 0.65·(1 - R_i) + 0.20·D_i + 0.10·(L_i / (L_i + 2)) + 0.05·(1 / (N_i + 1))
+```
+
+Each day's batch of 15 isn't purely the top 15 by score, either — it's 13 highest-priority words (exploit) plus 2 picked by weighted-random sampling over the rest (explore, softmax temperature 0.15), so mid-priority words still surface occasionally instead of being permanently crowded out by whatever's currently worst.
+
+Grading a review (again / hard / good / easy) updates `S_i` and `D_i` — a big jump in stability on "easy", a sharp drop plus a difficulty bump on "again" — and each grade carries its own cooldown (1–3 days) before that word can be selected again, so you can't just re-answer the same word repeatedly to game the schedule.
+
+Self-rated familiarity (unfamiliar/so-so/familiar) sits on top of this as a manual adjustment to the priority score, letting a "this one's easy for me" judgment call override the math when it disagrees.
+
 ## Tech
 
 A plain frontend site with no build step — native browser ES modules throughout:
