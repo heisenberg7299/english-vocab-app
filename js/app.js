@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=40";
-import { generateMnemonic } from "./mnemonic.js?v=40";
-import { translateToChinese } from "./translate.js?v=40";
-import * as store from "./storage.js?v=40";
-import * as srs from "./srs.js?v=40";
-import * as quiz from "./quiz.js?v=40";
-import * as cloud from "./cloud-sync.js?v=40";
+} from "./dictionary.js?v=41";
+import { generateMnemonic } from "./mnemonic.js?v=41";
+import { translateToChinese } from "./translate.js?v=41";
+import * as store from "./storage.js?v=41";
+import * as srs from "./srs.js?v=41";
+import * as quiz from "./quiz.js?v=41";
+import * as cloud from "./cloud-sync.js?v=41";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -255,6 +255,7 @@ async function doSearch(word) {
   status.textContent = "查詢中...";
   status.classList.remove("error");
   result.innerHTML = "";
+  inWordDetailView = false; // a fresh search always leaves detail-view mode
 
   try {
     const data = await attachChineseMeaning(await lookupWord(word));
@@ -272,9 +273,22 @@ async function doSearch(word) {
   }
 }
 
+// Whether the search tab is currently showing a word opened from
+// elsewhere (單字本/今日複習) rather than a fresh search — controls
+// whether the "← 返回" button is included. This has to live in
+// renderSearchResult itself (not just viewWordDetail's own HTML) since
+// every other function that refreshes #search-result after an in-place
+// edit (familiarity, translation) goes through here too, and previously
+// stomped the back button because it didn't know it needed to keep it.
+let inWordDetailView = false;
+
 function renderSearchResult(data) {
   const saved = !!store.getWord(data.word);
-  $("#search-result").innerHTML = renderWordCard(data, { saved });
+  const backLabel = wordDetailReturnTab === "review" ? "← 返回今日複習預告" : "← 返回單字本";
+  const backHtml = inWordDetailView
+    ? `<button type="button" class="back-btn" data-action="back-to-list">${backLabel}</button>`
+    : "";
+  $("#search-result").innerHTML = backHtml + renderWordCard(data, { saved });
 }
 
 // Tries all three dictionary sources in order for one query string;
@@ -561,14 +575,12 @@ function viewWordDetail(word, returnTab = "list") {
   const data = store.getWord(word);
   if (!data) return;
   wordDetailReturnTab = returnTab;
+  inWordDetailView = true;
   switchTab("search");
   lastSearchResult = data;
   $("#search-input").value = data.word;
   $("#search-status").textContent = "";
-  const backLabel = returnTab === "review" ? "← 返回今日複習預告" : "← 返回單字本";
-  $("#search-result").innerHTML = `
-    <button type="button" class="back-btn" data-action="back-to-list">${backLabel}</button>
-    ${renderWordCard(data, { saved: true })}`;
+  renderSearchResult(data);
 }
 
 // ---------- Bulk import ----------
