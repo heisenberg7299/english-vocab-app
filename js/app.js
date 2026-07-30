@@ -6,13 +6,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=32";
-import { generateMnemonic } from "./mnemonic.js?v=32";
-import { translateToChinese } from "./translate.js?v=32";
-import * as store from "./storage.js?v=32";
-import * as srs from "./srs.js?v=32";
-import * as quiz from "./quiz.js?v=32";
-import * as cloud from "./cloud-sync.js?v=32";
+} from "./dictionary.js?v=33";
+import { generateMnemonic } from "./mnemonic.js?v=33";
+import { translateToChinese } from "./translate.js?v=33";
+import * as store from "./storage.js?v=33";
+import * as srs from "./srs.js?v=33";
+import * as quiz from "./quiz.js?v=33";
+import * as cloud from "./cloud-sync.js?v=33";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -173,7 +173,7 @@ function renderWordCard(data, opts = {}) {
         <h2>${escapeHtml(data.word)}</h2>
         ${isPhrase(data.word) ? `<span class="phrase-badge">片語</span>` : ""}
         ${data.phonetic ? `<span class="phonetic">${escapeHtml(data.phonetic)}</span>` : ""}
-        ${data.audio ? `<button class="audio-btn" data-action="play-audio" data-src="${escapeHtml(data.audio)}">🔊</button>` : ""}
+        <button class="audio-btn" data-action="play-audio" data-word="${escapeHtml(data.word)}" data-src="${escapeHtml(data.audio || "")}">🔊</button>
         ${sourceLabel}
       </div>
       ${chineseHtml}
@@ -1310,6 +1310,33 @@ function updateDueBadge() {
   badge.classList.toggle("hidden", remaining === 0);
 }
 
+// Words looked up via the Datamuse/Wiktionary fallback sources never have
+// a recorded pronunciation clip (only the primary dictionary provides
+// one), and even when a clip exists, playback can fail silently for
+// reasons outside our control (autoplay policy, a blocked CDN, a flaky
+// network) — the old code just swallowed that with .catch(() => {}), so
+// the speaker button looked "broken" with zero feedback either way. Now
+// it always tries the real clip first when there is one, and falls back
+// to the browser's own text-to-speech either way, so the button always
+// does *something* audible.
+function speakWord(word) {
+  if (!word || !("speechSynthesis" in window)) return;
+  const utterance = new SpeechSynthesisUtterance(word);
+  utterance.lang = "en-US";
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utterance);
+}
+
+function playWordAudio(word, src) {
+  if (!src) {
+    speakWord(word);
+    return;
+  }
+  const audio = new Audio(src);
+  audio.addEventListener("error", () => speakWord(word), { once: true });
+  audio.play().catch(() => speakWord(word));
+}
+
 // ---------- Global event delegation ----------
 function initGlobalEvents() {
   document.body.addEventListener("click", (e) => {
@@ -1325,10 +1352,7 @@ function initGlobalEvents() {
       renderWordList();
     }
     if (action === "view") viewWordDetail(target.dataset.word, target.dataset.return || "list");
-    if (action === "play-audio") {
-      const audio = new Audio(target.dataset.src);
-      audio.play().catch(() => {});
-    }
+    if (action === "play-audio") playWordAudio(target.dataset.word, target.dataset.src);
     if (action === "grade") gradeCurrentWord(Number(target.dataset.grade));
     if (action === "answer") handleQuizAnswer(Number(target.dataset.index));
     if (action === "next-question") goToNextReviewCard();
