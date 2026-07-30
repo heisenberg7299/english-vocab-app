@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=41";
-import { generateMnemonic } from "./mnemonic.js?v=41";
-import { translateToChinese } from "./translate.js?v=41";
-import * as store from "./storage.js?v=41";
-import * as srs from "./srs.js?v=41";
-import * as quiz from "./quiz.js?v=41";
-import * as cloud from "./cloud-sync.js?v=41";
+} from "./dictionary.js?v=42";
+import { generateMnemonic } from "./mnemonic.js?v=42";
+import { translateToChinese } from "./translate.js?v=42";
+import * as store from "./storage.js?v=42";
+import * as srs from "./srs.js?v=42";
+import * as quiz from "./quiz.js?v=42";
+import * as cloud from "./cloud-sync.js?v=42";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -934,8 +934,9 @@ function extendReviewQueue() {
 }
 
 function continueReviewSession() {
-  extendReviewQueue();
-  renderCurrentReviewCard();
+  if (!extendReviewQueue()) return;
+  reviewStarted = false;
+  renderReviewPreview();
 }
 
 // Entering the review tab shows a preview of what's coming up first — but
@@ -954,10 +955,17 @@ function renderReview() {
   renderReviewPreview();
 }
 
+// Previews whatever in reviewQueue hasn't been reviewed yet — for the
+// first round that's the whole queue (reviewIndex is 0), and for a round
+// started via continueReviewSession() it's just the newly appended words
+// (reviewIndex already sits at the boundary from the previous round), so
+// "再複習 15 個" gets its own preview screen the same as the first round
+// does, instead of jumping straight into questions.
 function renderReviewPreview() {
   const area = $("#review-area");
+  const upcoming = reviewQueue.slice(reviewIndex);
 
-  if (!reviewQueue.length) {
+  if (!upcoming.length) {
     area.innerHTML = `
       <div class="review-empty">
         <div class="big">📭</div>
@@ -971,10 +979,10 @@ function renderReviewPreview() {
     <div class="review-card">
       <h3>${weekly ? "📅 本週總複習" : "📋 今日複習預告"}</h3>
       <p class="status">
-        ${weekly ? "這禮拜複習過的" : "今天會複習這"} ${reviewQueue.length} 個單字：
+        ${weekly ? "這禮拜複習過的" : "接下來會複習這"} ${upcoming.length} 個單字：
       </p>
       <div class="preview-word-list">
-        ${reviewQueue
+        ${upcoming
           .map((w) => {
             const pos = w.meanings?.[0]?.partOfSpeech || "";
             return `
@@ -992,7 +1000,6 @@ function renderReviewPreview() {
 
 function startReviewSession() {
   reviewStarted = true;
-  reviewIndex = 0;
   renderCurrentReviewCard();
 }
 
