@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=37";
-import { generateMnemonic } from "./mnemonic.js?v=37";
-import { translateToChinese } from "./translate.js?v=37";
-import * as store from "./storage.js?v=37";
-import * as srs from "./srs.js?v=37";
-import * as quiz from "./quiz.js?v=37";
-import * as cloud from "./cloud-sync.js?v=37";
+} from "./dictionary.js?v=38";
+import { generateMnemonic } from "./mnemonic.js?v=38";
+import { translateToChinese } from "./translate.js?v=38";
+import * as store from "./storage.js?v=38";
+import * as srs from "./srs.js?v=38";
+import * as quiz from "./quiz.js?v=38";
+import * as cloud from "./cloud-sync.js?v=38";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -1198,10 +1198,37 @@ function renderFlashcards() {
   }
 }
 
+// Don't hand back a word shown in the last few draws — with a small
+// library, uniform random draws collide on the same word way too often.
+const FLASHCARD_NO_REPEAT_WINDOW = 8;
+
+// Weighted random draw biased toward low-retention (at-risk) words,
+// rather than picking uniformly — a word about to be forgotten should
+// show up more often than one just reviewed. Words never reviewed yet
+// (no retention estimate) get a neutral mid-weight so they still surface
+// regularly without either dominating or being crowded out.
+function pickWeightedFlashcard(words) {
+  const recentlyShown = new Set(flashcardHistory.slice(-FLASHCARD_NO_REPEAT_WINDOW));
+  let pool = words.filter((w) => !recentlyShown.has(w.word));
+  if (!pool.length) pool = words; // exclusion emptied the pool (tiny library) — fall back to everyone
+
+  const weights = pool.map((w) => {
+    const r = srs.retention(w.srs);
+    return r === null ? 0.5 : Math.max(0.05, 1 - r);
+  });
+  const total = weights.reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  for (let i = 0; i < pool.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return pool[i].word;
+  }
+  return pool[pool.length - 1].word;
+}
+
 function drawRandomFlashcard() {
   const words = store.loadWords();
   if (!words.length) return;
-  const pick = words[Math.floor(Math.random() * words.length)].word;
+  const pick = pickWeightedFlashcard(words);
   flashcardHistory = flashcardHistory.slice(0, flashcardHistoryPos + 1);
   flashcardHistory.push(pick);
   flashcardHistoryPos = flashcardHistory.length - 1;
