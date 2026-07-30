@@ -3,16 +3,17 @@ import {
   lookupWordFallback,
   lookupWordWiktionary,
   fetchSimilarWords,
+  fetchRelatedWords,
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=35";
-import { generateMnemonic } from "./mnemonic.js?v=35";
-import { translateToChinese } from "./translate.js?v=35";
-import * as store from "./storage.js?v=35";
-import * as srs from "./srs.js?v=35";
-import * as quiz from "./quiz.js?v=35";
-import * as cloud from "./cloud-sync.js?v=35";
+} from "./dictionary.js?v=36";
+import { generateMnemonic } from "./mnemonic.js?v=36";
+import { translateToChinese } from "./translate.js?v=36";
+import * as store from "./storage.js?v=36";
+import * as srs from "./srs.js?v=36";
+import * as quiz from "./quiz.js?v=36";
+import * as cloud from "./cloud-sync.js?v=36";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -587,6 +588,90 @@ function parseImportInput(raw) {
     words.push(w);
   }
   return words;
+}
+
+// ---------- Word suggestions ----------
+// Seeds a handful of random words already in the library and asks Datamuse
+// for semantically related words (its ml= "means like" param) for each —
+// in practice this surfaces genuine GRE-level synonyms/near-synonyms when
+// seeded from GRE-level words, since it's just following the same register
+// the seed word is already in. Words suggested by more than one seed are
+// ranked higher, on the theory that cross-seed agreement means it's more
+// central to the vocabulary the user is already building.
+const SUGGEST_SEED_COUNT = 5;
+const SUGGEST_RESULT_COUNT = 12;
+
+function pickRandomSeeds(words, count) {
+  const pool = [...words];
+  const picked = [];
+  while (pool.length && picked.length < count) {
+    const i = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(i, 1)[0]);
+  }
+  return picked;
+}
+
+async function generateWordSuggestions() {
+  const words = store.loadWords();
+  if (!words.length) return [];
+
+  const existing = new Set(words.map((w) => w.word.toLowerCase()));
+  const seeds = pickRandomSeeds(words, SUGGEST_SEED_COUNT);
+  const scores = new Map();
+
+  const results = await Promise.all(seeds.map((w) => fetchRelatedWords(w.word)));
+  for (const related of results) {
+    for (const candidate of related) {
+      const key = candidate.toLowerCase();
+      if (existing.has(key)) continue;
+      scores.set(key, (scores.get(key) || 0) + 1);
+    }
+  }
+
+  return [...scores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, SUGGEST_RESULT_COUNT)
+    .map(([word]) => word);
+}
+
+async function refreshSuggestions() {
+  const btn = $("#suggest-refresh-btn");
+  const progress = $("#suggest-progress");
+  const result = $("#suggest-result");
+
+  if (!store.loadWords().length) {
+    result.innerHTML = `<p class="status">單字本裡還沒有字，先加幾個單字，才能根據它們推薦相關的字。</p>`;
+    return;
+  }
+
+  btn.disabled = true;
+  progress.textContent = "推薦中...";
+  result.innerHTML = "";
+
+  const suggestions = await generateWordSuggestions();
+
+  progress.textContent = "";
+  btn.disabled = false;
+
+  result.innerHTML = suggestions.length
+    ? suggestions
+        .map(
+          (w) =>
+            `<span class="suggestion-chip" data-action="search-suggestion" data-word="${escapeHtml(w)}">${escapeHtml(w)}</span>`
+        )
+        .join("")
+    : `<p class="status">目前沒有找到新的推薦字，換一批試試看。</p>`;
+}
+
+function initSuggest() {
+  $("#suggest-toggle-btn").addEventListener("click", () => {
+    const panel = $("#suggest-panel");
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden") && !$("#suggest-result").children.length) {
+      refreshSuggestions();
+    }
+  });
+  $("#suggest-refresh-btn").addEventListener("click", refreshSuggestions);
 }
 
 async function runBulkImport() {
@@ -1425,6 +1510,11 @@ function initGlobalEvents() {
       $("#search-input").value = target.dataset.word;
       doSearch(target.dataset.word);
     }
+    if (action === "search-suggestion") {
+      switchTab("search");
+      $("#search-input").value = target.dataset.word;
+      doSearch(target.dataset.word);
+    }
     if (action === "manual-entry") renderManualEntryForm(target.dataset.word);
     if (action === "save-manual") saveManualWord(target.dataset.word);
     if (action === "manual-entry-jump") jumpToManualEntry(target.dataset.word);
@@ -1518,6 +1608,7 @@ function renderAuthArea(user) {
 initTabs();
 initSearch();
 initImport();
+initSuggest();
 initAuth();
 initGlobalEvents();
 updateDueBadge();

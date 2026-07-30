@@ -4,11 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>單字背起來 · 英文單字學習</title>
-<link rel="stylesheet" href="style.css?v=35" />
-<link rel="manifest" href="manifest.json?v=35" />
+<link rel="stylesheet" href="style.css?v=36" />
+<link rel="manifest" href="manifest.json?v=36" />
 <meta name="theme-color" content="#2f7a86" />
-<link rel="icon" href="icons/icon-192.png?v=35" />
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=35" />
+<link rel="icon" href="icons/icon-192.png?v=36" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=36" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="單字背起來" />
@@ -69,6 +69,7 @@
         <input id="list-filter" type="text" placeholder="搜尋單字本..." />
         <button id="import-toggle-btn" type="button">＋ 批次匯入單字</button>
         <button id="backfill-zh-btn" type="button">補上缺少的中文</button>
+        <button id="suggest-toggle-btn" type="button">推薦單字</button>
       </div>
       <div id="backfill-status" class="status"></div>
 
@@ -80,6 +81,15 @@
           <span id="import-progress" class="import-progress"></span>
         </div>
         <div id="import-result"></div>
+      </div>
+
+      <div id="suggest-panel" class="import-panel hidden">
+        <p class="import-hint">根據你單字本裡已有的字，推薦意思相近或相關的字。點一個字可以跳去查看完整解釋再決定要不要加入。</p>
+        <div class="import-actions">
+          <button id="suggest-refresh-btn" type="button" class="primary">換一批</button>
+          <span id="suggest-progress" class="import-progress"></span>
+        </div>
+        <div id="suggest-result"></div>
       </div>
 
       <div id="word-list" class="word-grid"></div>
@@ -110,7 +120,7 @@
   </main>
 </div>
 
-<script type="module" src="js/app.js?v=35"></script>
+<script type="module" src="js/app.js?v=36"></script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));

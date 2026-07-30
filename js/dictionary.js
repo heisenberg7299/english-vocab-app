@@ -273,6 +273,21 @@ export async function fetchSimilarWords(word) {
   }
 }
 
+// Meaning-related words (synonyms/close concepts) via Datamuse's ml=
+// ("means like") param — used to suggest new words worth learning, seeded
+// from words already in the user's own list.
+export async function fetchRelatedWords(word) {
+  const clean = word.trim().toLowerCase();
+  try {
+    const res = await fetch(`${DATAMUSE_BASE}?ml=${encodeURIComponent(clean)}&max=15`);
+    if (!res.ok) return [];
+    const entries = await res.json();
+    return entries.map((e) => e.word).filter((w) => w.toLowerCase() !== clean);
+  } catch {
+    return [];
+  }
+}
+
 // Builds a word record from a user-typed definition, for words no
 // dictionary API has at all.
 export function buildManualWordData(word, { partOfSpeech, definition, example }) {
