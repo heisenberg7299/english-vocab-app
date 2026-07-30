@@ -1,32 +1,32 @@
-# 單字背起來
+# Vocab App (單字背起來)
 
-一個給自己用的英文（GRE 程度）背單字網站，查單字/片語自動抓解釋和例句，並用數學化的遺忘曲線模型排每天的複習進度。
+A personal English (GRE-level) vocabulary trainer. Look up words or phrases and get instant definitions and examples, then review on a schedule driven by a real spaced-repetition / forgetting-curve model.
 
-**線上使用：** https://heisenberg7299.github.io/english-vocab-app/
+**Live site:** https://heisenberg7299.github.io/english-vocab-app/
 
-## 功能
+## Features
 
-- **查單字／片語**：輸入英文單字或片語，自動查詢解釋、詞性、例句、同義字、反義字，並附上中文翻譯（繁體）與自動產生的記憶技巧
-- **今日複習**：不用固定的到期日排程，而是每天用一個優先分數（記憶保留率、難度、答錯次數、複習次數綜合計算）從整個單字本裡選出當天最該複習的單字，一天只能複習一次
-- **GRE 風格測驗**：複習用選擇題（例句填空、字義選擇、同義字選擇），而不是單純的記不記得
-- **字卡模式**：隨時可以抽字卡複習，不限於當天批次
-- **熟悉度標記**：可以手動把單字標成不熟／普通／熟悉，會影響複習排程的優先順序
-- **學習歷程日曆**：記錄哪天新增了哪些字、複習了哪些字
-- **統計**：單字總數、連續複習天數、平均記憶保留率、熟悉度分布等
-- **雲端同步**：登入後單字本會同步到 Firestore，不同裝置登入同一帳號可以看到同一份資料
-- **PWA**：可以加到手機主畫面或桌面，當成獨立 App 使用
+- **Word/phrase lookup** — enter an English word or phrase and get its definitions, part of speech, examples, synonyms, and antonyms, plus a Traditional Chinese translation and an auto-generated mnemonic
+- **Daily review** — instead of a fixed due-date schedule, each day picks the words most worth reviewing across the whole library by a priority score (predicted retention, difficulty, past mistakes, review count); locked to once per day
+- **GRE-style quizzes** — review via multiple choice (cloze/fill-in-the-blank, definition matching, synonym matching), not just "did I remember it"
+- **Flashcards** — draw random cards any time, not limited to the day's review batch
+- **Familiarity tags** — mark words as unfamiliar/so-so/familiar; feeds back into review priority
+- **Learning history calendar** — tracks which words were added or reviewed on which day
+- **Stats** — total words, review streak, average retention, familiarity breakdown, and more
+- **Cloud sync** — log in and your word list syncs to Firestore, so any device signed into the same account sees the same data
+- **PWA** — installable to a phone home screen or desktop as a standalone app
 
-## 技術
+## Tech
 
-純前端網站，沒有建置流程（no build step），直接用瀏覽器原生 ES modules：
+A plain frontend site with no build step — native browser ES modules throughout:
 
-- `index.html` / `style.css` / `js/app.js` — 頁面結構、樣式、主要邏輯
-- `js/dictionary.js` — 查單字/片語，依序嘗試 [Free Dictionary API](https://dictionaryapi.dev/)、[Datamuse](https://www.datamuse.com/api/)、[Wiktionary](https://en.wiktionary.org/) 三個免費來源
-- `js/translate.js` — 用 [MyMemory](https://mymemory.translated.net/) 翻譯中文，並用 [opencc-js](https://github.com/nk2028/opencc-js) 確保輸出一定是繁體
-- `js/srs.js` — 間隔複習排程演算法（基於記憶穩定度與遺忘曲線的優先分數模型）
-- `js/quiz.js` — GRE 風格選擇題產生邏輯
-- `js/mnemonic.js` — 規則式記憶技巧產生器（字首字根字尾拆解）
-- `js/storage.js` / `js/cloud-sync.js` — 本機快取（localStorage）與 Firebase（Firestore + Authentication）雲端同步
-- `sw.js` / `manifest.json` — PWA 設定，network-first 的 service worker
+- `index.html` / `style.css` / `js/app.js` — page structure, styling, and main UI logic
+- `js/dictionary.js` — word/phrase lookup, trying three free sources in order: [Free Dictionary API](https://dictionaryapi.dev/), [Datamuse](https://www.datamuse.com/api/), and [Wiktionary](https://en.wiktionary.org/) directly
+- `js/translate.js` — Chinese translation via [MyMemory](https://mymemory.translated.net/), converted to guaranteed Traditional Chinese with [opencc-js](https://github.com/nk2028/opencc-js)
+- `js/srs.js` — the spaced-repetition scheduling algorithm (a priority score built from memory stability and a forgetting-curve model)
+- `js/quiz.js` — GRE-style multiple-choice question generation
+- `js/mnemonic.js` — rule-based mnemonic generator (prefix/root/suffix breakdown)
+- `js/storage.js` / `js/cloud-sync.js` — local cache (localStorage) and Firebase (Firestore + Authentication) cloud sync
+- `sw.js` / `manifest.json` — PWA setup, with a network-first service worker
 
-託管在 GitHub Pages，`?v=N` 版本號手動管理快取更新。
+Hosted on GitHub Pages; cache-busting is handled manually via `?v=N` query strings.
