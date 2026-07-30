@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=36";
-import { generateMnemonic } from "./mnemonic.js?v=36";
-import { translateToChinese } from "./translate.js?v=36";
-import * as store from "./storage.js?v=36";
-import * as srs from "./srs.js?v=36";
-import * as quiz from "./quiz.js?v=36";
-import * as cloud from "./cloud-sync.js?v=36";
+} from "./dictionary.js?v=37";
+import { generateMnemonic } from "./mnemonic.js?v=37";
+import { translateToChinese } from "./translate.js?v=37";
+import * as store from "./storage.js?v=37";
+import * as srs from "./srs.js?v=37";
+import * as quiz from "./quiz.js?v=37";
+import * as cloud from "./cloud-sync.js?v=37";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -1340,6 +1340,92 @@ function viewCalendarDay(dateStr) {
     </div>`;
 }
 
+// Last 30 days of review activity, split into correct/wrong per day —
+// quality < 3 means "again"/forgot in both the quiz flow (correct=5,
+// wrong=2) and the flashcard self-grade flow (again=1), so it's a
+// consistent "did this go well" threshold across both review modes.
+function reviewActivityLast30Days(words) {
+  const days = [];
+  const today = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+  const byDate = new Map(days.map((d) => [d, { correct: 0, wrong: 0 }]));
+  for (const w of words) {
+    for (const h of w.srs?.reviewHistory || []) {
+      const bucket = byDate.get(h.date);
+      if (!bucket) continue;
+      if (h.quality < 3) bucket.wrong += 1;
+      else bucket.correct += 1;
+    }
+  }
+  return days.map((d) => ({ date: d, ...byDate.get(d) }));
+}
+
+function renderReviewActivityChart(words) {
+  const days = reviewActivityLast30Days(words);
+  const max = Math.max(1, ...days.map((d) => d.correct + d.wrong));
+
+  const bars = days
+    .map((d, i) => {
+      const total = d.correct + d.wrong;
+      const correctPct = (d.correct / max) * 100;
+      const wrongPct = (d.wrong / max) * 100;
+      const [, m, day] = d.date.split("-");
+      const showLabel = i % 5 === 0 || i === days.length - 1;
+      return `
+        <div class="bar-col" title="${d.date}：答對 ${d.correct}、答錯 ${d.wrong}">
+          <div class="bar-stack">
+            ${total ? `<div class="bar-seg bar-wrong" style="height:${wrongPct}%"></div><div class="bar-seg bar-correct" style="height:${correctPct}%"></div>` : ""}
+          </div>
+          <div class="bar-label">${showLabel ? `${Number(m)}/${Number(day)}` : ""}</div>
+        </div>`;
+    })
+    .join("");
+
+  return `
+    <div class="chart-section">
+      <h3>近 30 天複習活動</h3>
+      <div class="bar-chart">${bars}</div>
+      <div class="chart-legend">
+        <span class="chart-legend-item"><span class="chart-dot" style="background:#22c55e"></span>答對/記得</span>
+        <span class="chart-legend-item"><span class="chart-dot" style="background:#ef4444"></span>答錯/忘記</span>
+      </div>
+    </div>`;
+}
+
+function renderRetentionHistogram(words) {
+  const labels = ["0–20%", "20–40%", "40–60%", "60–80%", "80–100%"];
+  const buckets = [0, 0, 0, 0, 0];
+  for (const w of words) {
+    const r = srs.retention(w.srs);
+    if (r === null) continue;
+    const pct = Math.max(0, Math.min(100, r * 100));
+    buckets[Math.min(4, Math.floor(pct / 20))] += 1;
+  }
+  const max = Math.max(1, ...buckets);
+
+  const bars = buckets
+    .map(
+      (count, i) => `
+        <div class="bar-col" title="${labels[i]}：${count} 個單字">
+          <div class="bar-stack">
+            ${count ? `<div class="bar-seg bar-retention" style="height:${(count / max) * 100}%"></div>` : ""}
+          </div>
+          <div class="bar-label">${labels[i]}</div>
+        </div>`
+    )
+    .join("");
+
+  return `
+    <div class="chart-section">
+      <h3>記憶保留率分布</h3>
+      <div class="bar-chart bar-chart-wide">${bars}</div>
+    </div>`;
+}
+
 // ---------- Stats tab ----------
 function renderStats() {
   const words = store.loadWords();
@@ -1383,7 +1469,9 @@ function renderStats() {
         <div class="fam-breakdown-item"><span class="fam-num" style="color:var(--muted)">${famCounts.none}</span><span class="label">未標記</span></div>
       </div>
       <div class="label" style="margin-top:10px;">熟悉度分布</div>
-    </div>`;
+    </div>
+    ${renderReviewActivityChart(words)}
+    ${renderRetentionHistogram(words)}`;
 }
 
 // ---------- Milestones ----------
