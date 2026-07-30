@@ -6,13 +6,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=34";
-import { generateMnemonic } from "./mnemonic.js?v=34";
-import { translateToChinese } from "./translate.js?v=34";
-import * as store from "./storage.js?v=34";
-import * as srs from "./srs.js?v=34";
-import * as quiz from "./quiz.js?v=34";
-import * as cloud from "./cloud-sync.js?v=34";
+} from "./dictionary.js?v=35";
+import { generateMnemonic } from "./mnemonic.js?v=35";
+import { translateToChinese } from "./translate.js?v=35";
+import * as store from "./storage.js?v=35";
+import * as srs from "./srs.js?v=35";
+import * as quiz from "./quiz.js?v=35";
+import * as cloud from "./cloud-sync.js?v=35";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -669,7 +669,7 @@ async function runBulkImport() {
 }
 
 // ---------- Review tab ----------
-const DAILY_REVIEW_LIMIT = 15;
+const REVIEW_ROUND_SIZE = 15;
 // Bump this key's suffix whenever the selection algorithm changes underneath
 // it — otherwise a session pinned under the old logic keeps being reused
 // (same date = same day) instead of being recomputed with the new one.
@@ -705,14 +705,18 @@ function weeklyReviewedWords(allWords, today = new Date()) {
 }
 
 // No fixed due date anymore — every word has a priority score (forgetting
-// risk + difficulty + lapse history, see srs.js) and each day the top
-// DAILY_REVIEW_LIMIT across the whole library get selected (mostly the
+// risk + difficulty + lapse history, see srs.js) and each round the top
+// REVIEW_ROUND_SIZE across the whole library get selected (mostly the
 // highest-priority ones, plus a couple of weighted-random picks so
-// mid-priority words don't get starved forever). On Sundays, review
-// everything touched since Monday instead, with no cap, as a weekly
-// wrap-up. Which words count as "today's batch" is pinned to a
+// mid-priority words don't get starved forever). There's no cap on how
+// many rounds you can do in one day — finishing a round grades those
+// words, which puts them on cooldown (see srs.js), so the next round's
+// selectDailyWords call naturally surfaces a fresh set instead of
+// repeating what was just answered (see extendReviewQueue below). On
+// Sundays, review everything touched since Monday instead, uncapped, as
+// a weekly wrap-up. Which words are in play today is pinned to a
 // date-stamped list in localStorage, so re-opening the tab doesn't hand
-// out a fresh batch on top of ones already reviewed.
+// out a fresh round on top of ones already reviewed.
 function getTodayReviewQueue(allWords) {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
@@ -734,7 +738,7 @@ function getTodayReviewQueue(allWords) {
     const weekly = isSunday(now) ? weeklyReviewedWords(allWords, now) : [];
     const picked = weekly.length
       ? weekly
-      : srs.selectDailyWords(allWords.filter((w) => w.srs), DAILY_REVIEW_LIMIT);
+      : srs.selectDailyWords(allWords.filter((w) => w.srs), REVIEW_ROUND_SIZE);
 
     session = { date: today, words: picked.map((w) => w.word), weekly: weekly.length > 0 };
     localStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(session));
@@ -786,6 +790,53 @@ function saveReviewProgress(progress) {
 function buildReviewQueue() {
   reviewQueue = getTodayReviewQueue(store.loadWords());
   reviewIndex = getTodayReviewProgress();
+}
+
+// Words already reviewed today are on cooldown (see srs.js), so this
+// naturally returns a fresh set rather than repeating today's round(s) —
+// no need to explicitly track/exclude what's already in the session.
+function nextRoundCandidates(allWords) {
+  return srs.selectDailyWords(allWords.filter((w) => w.srs), REVIEW_ROUND_SIZE);
+}
+
+// Whether starting another round today would actually turn up anything —
+// used to decide whether to offer a "continue" button after finishing a
+// round, without committing to a new round just to check.
+function moreWordsAvailableToday() {
+  if (isTodayWeeklyReview()) return false; // weekly mode is already uncapped in one go
+  return nextRoundCandidates(store.loadWords()).length > 0;
+}
+
+// Appends another round's worth of words to today's pinned session
+// instead of replacing it, so finishing a round doesn't lock you out for
+// the day if you want to keep going.
+function extendReviewQueue() {
+  const allWords = store.loadWords();
+  const nextBatch = nextRoundCandidates(allWords);
+  if (!nextBatch.length) return false;
+
+  const today = new Date().toISOString().slice(0, 10);
+  let session;
+  try {
+    session = JSON.parse(localStorage.getItem(REVIEW_SESSION_KEY) || "null");
+  } catch {
+    session = null;
+  }
+  if (!session || session.date !== today) return false;
+
+  const existing = new Set(session.words);
+  const newWords = nextBatch.map((w) => w.word).filter((w) => !existing.has(w));
+  if (!newWords.length) return false;
+
+  session.words = [...session.words, ...newWords];
+  localStorage.setItem(REVIEW_SESSION_KEY, JSON.stringify(session));
+  reviewQueue = getTodayReviewQueue(allWords);
+  return true;
+}
+
+function continueReviewSession() {
+  extendReviewQueue();
+  renderCurrentReviewCard();
 }
 
 // Entering the review tab shows a preview of what's coming up first — but
@@ -858,10 +909,18 @@ function renderCurrentReviewCard() {
   currentQuestion = null;
 
   if (reviewIndex >= reviewQueue.length) {
+    const canContinue = reviewQueue.length > 0 && moreWordsAvailableToday();
     area.innerHTML = `
       <div class="review-empty">
         <div class="big">${reviewQueue.length ? "🎉" : "📭"}</div>
-        <p>${reviewQueue.length ? "今天的複習都完成了，明天再來！" : "目前沒有到期需要複習的單字。"}</p>
+        <p>${
+          reviewQueue.length
+            ? canContinue
+              ? "這一輪複習完成了！"
+              : "今天的複習都完成了，明天再來！"
+            : "目前沒有到期需要複習的單字。"
+        }</p>
+        ${canContinue ? `<button class="reveal-btn" data-action="continue-review">再複習 ${REVIEW_ROUND_SIZE} 個</button>` : ""}
       </div>`;
     return;
   }
@@ -1357,6 +1416,7 @@ function initGlobalEvents() {
     if (action === "answer") handleQuizAnswer(Number(target.dataset.index));
     if (action === "next-question") goToNextReviewCard();
     if (action === "start-review") startReviewSession();
+    if (action === "continue-review") continueReviewSession();
     if (action === "cal-prev-month") changeCalendarMonth(-1);
     if (action === "cal-next-month") changeCalendarMonth(1);
     if (action === "view-cal-day") viewCalendarDay(target.dataset.date);
