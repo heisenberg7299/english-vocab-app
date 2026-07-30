@@ -776,7 +776,13 @@ button { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.1
 .bar-seg.bar-correct { background: #22c55e; }
 .bar-seg.bar-wrong { background: #ef4444; }
 .bar-seg.bar-retention { background: var(--primary); }
-.bar-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.bar-label {
+  font-size: 10px;
+  line-height: 14px;
+  height: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .chart-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--muted); }
 .chart-legend-item { display: flex; align-items: center; gap: 5px; }
 .chart-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
