@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=43";
-import { generateMnemonic } from "./mnemonic.js?v=43";
-import { translateToChinese } from "./translate.js?v=43";
-import * as store from "./storage.js?v=43";
-import * as srs from "./srs.js?v=43";
-import * as quiz from "./quiz.js?v=43";
-import * as cloud from "./cloud-sync.js?v=43";
+} from "./dictionary.js?v=44";
+import { generateMnemonic } from "./mnemonic.js?v=44";
+import { translateToChinese } from "./translate.js?v=44";
+import * as store from "./storage.js?v=44";
+import * as srs from "./srs.js?v=44";
+import * as quiz from "./quiz.js?v=44";
+import * as cloud from "./cloud-sync.js?v=44";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
