@@ -307,6 +307,41 @@ button {
   color: var(--muted);
   margin-left: 6px;
 }
+.edit-zh-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  margin-left: 4px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  opacity: 0.6;
+}
+.edit-zh-btn:hover { opacity: 1; background: #e5f3f2; }
+.zh-edit-input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  resize: vertical;
+}
+.zh-edit-actions { display: flex; gap: 8px; margin-top: 6px; }
+.zh-edit-actions button {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.zh-edit-actions button.primary { background: var(--primary-gradient); color: #fff; border-color: var(--primary); }
 .translate-btn {
   margin-top: 8px;
   padding: 6px 12px;
@@ -914,6 +949,10 @@ button {
   .manual-form input,
   .manual-form textarea { background: #0e1a1a; color: var(--text); border-color: var(--border); }
   .translate-btn { background: #17262a; color: var(--text); border-color: var(--border); }
+  .edit-zh-btn:hover { background: #1c3436; }
+  .zh-edit-input { background: #0e1a1a; color: var(--text); border-color: var(--border); }
+  .zh-edit-actions button { background: #17262a; color: var(--text); border-color: var(--border); }
+  .zh-edit-actions button.primary { color: #fff; }
   .auth-btn { background: #17262a; color: var(--text); border-color: var(--border); }
   .auth-panel input { background: #0e1a1a; color: var(--text); border-color: var(--border); }
   .auth-actions button { background: #17262a; color: var(--text); border-color: var(--border); }

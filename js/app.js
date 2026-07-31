@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=46";
-import { generateMnemonic } from "./mnemonic.js?v=46";
-import { translateToChinese } from "./translate.js?v=46";
-import * as store from "./storage.js?v=46";
-import * as srs from "./srs.js?v=46";
-import * as quiz from "./quiz.js?v=46";
-import * as cloud from "./cloud-sync.js?v=46";
+} from "./dictionary.js?v=47";
+import { generateMnemonic } from "./mnemonic.js?v=47";
+import { translateToChinese } from "./translate.js?v=47";
+import * as store from "./storage.js?v=47";
+import * as srs from "./srs.js?v=47";
+import * as quiz from "./quiz.js?v=47";
+import * as cloud from "./cloud-sync.js?v=47";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -144,7 +144,10 @@ function renderWordCard(data, opts = {}) {
       : "";
 
   const chineseHtml = data.chineseMeaning
-    ? `<div class="chinese-meaning"><span class="def-label">中文意思</span> ${escapeHtml(data.chineseMeaning)}<span class="mt-note">（機器翻譯，僅供參考）</span></div>`
+    ? `<div class="chinese-meaning">
+         <span class="def-label">中文意思</span> ${escapeHtml(data.chineseMeaning)}<span class="mt-note">（機器翻譯，僅供參考）</span>
+         ${saved ? `<button type="button" class="edit-zh-btn" data-action="edit-chinese" data-word="${escapeHtml(data.word)}" title="編輯中文意思">✏️</button>` : ""}
+       </div>`
     : saved
     ? `<button class="translate-btn" data-action="translate" data-word="${escapeHtml(data.word)}">翻譯成中文</button>`
     : "";
@@ -496,33 +499,10 @@ function renderWordList() {
     .join("");
 }
 
-// Backfills a Chinese gloss for a word already saved before this feature
-// existed (or whose translation lookup failed the first time).
-async function translateWord(word) {
-  const data = store.getWord(word);
-  if (!data) return;
-
-  const chineseMeaning = await translateToChinese(data.word);
-  if (!chineseMeaning) return;
-
-  const updated = { ...data, chineseMeaning };
-  store.upsertWord(updated);
-
-  if (lastSearchResult?.word === updated.word) lastSearchResult = updated;
-  const shownCard = $("#search-result [data-word-card]");
-  if (shownCard && shownCard.dataset.wordCard.toLowerCase() === updated.word) {
-    renderSearchResult(updated);
-  }
-}
-
-// Self-rated familiarity (不熟/普通/熟悉), separate from the SRS ease
-// factor — shown as a colored highlight on the word's card in 我的單字本.
-function setFamiliarity(word, level) {
-  const data = store.getWord(word);
-  if (!data) return;
-
-  const updated = { ...data, familiarity: level };
-  store.upsertWord(updated);
+// Re-renders whichever view(s) currently show this word's card after an
+// in-place edit (familiarity, Chinese meaning, translation) — shared by
+// every function below that mutates a saved word without a full re-search.
+function refreshWordViews(word, updated) {
   if (lastSearchResult?.word === updated.word) lastSearchResult = updated;
 
   const searchCard = $("#search-result [data-word-card]");
@@ -534,6 +514,63 @@ function setFamiliarity(word, level) {
     flipCurrentFlashcard();
   }
   if (activeTab === "list") renderWordList();
+}
+
+// Backfills a Chinese gloss for a word already saved before this feature
+// existed (or whose translation lookup failed the first time).
+async function translateWord(word) {
+  const data = store.getWord(word);
+  if (!data) return;
+
+  const chineseMeaning = await translateToChinese(data.word);
+  if (!chineseMeaning) return;
+
+  const updated = { ...data, chineseMeaning };
+  store.upsertWord(updated);
+  refreshWordViews(word, updated);
+}
+
+// Machine translation sometimes gets it wrong (or picks an odd sense of an
+// ambiguous word) — this lets the user overwrite it with their own wording
+// instead of being stuck with whatever the API returned.
+function startEditChinese(container, word) {
+  const data = store.getWord(word);
+  if (!data || !container) return;
+  container.innerHTML = `
+    <span class="def-label">中文意思</span>
+    <textarea class="zh-edit-input" rows="2">${escapeHtml(data.chineseMeaning || "")}</textarea>
+    <div class="zh-edit-actions">
+      <button type="button" class="primary" data-action="save-chinese" data-word="${escapeHtml(word)}">儲存</button>
+      <button type="button" data-action="cancel-edit-chinese" data-word="${escapeHtml(word)}">取消</button>
+    </div>`;
+  container.querySelector(".zh-edit-input")?.focus();
+}
+
+function saveChineseEdit(container, word) {
+  const data = store.getWord(word);
+  const textarea = container?.querySelector(".zh-edit-input");
+  if (!data || !textarea) return;
+
+  const updated = { ...data, chineseMeaning: textarea.value.trim() };
+  store.upsertWord(updated);
+  refreshWordViews(word, updated);
+}
+
+function cancelEditChinese(word) {
+  const data = store.getWord(word);
+  if (!data) return;
+  refreshWordViews(word, data);
+}
+
+// Self-rated familiarity (不熟/普通/熟悉), separate from the SRS ease
+// factor — shown as a colored highlight on the word's card in 我的單字本.
+function setFamiliarity(word, level) {
+  const data = store.getWord(word);
+  if (!data) return;
+
+  const updated = { ...data, familiarity: level };
+  store.upsertWord(updated);
+  refreshWordViews(word, updated);
 }
 
 // Backfills Chinese glosses for every saved word that doesn't have one yet
@@ -1702,6 +1739,9 @@ function initGlobalEvents() {
     if (action === "save-manual") saveManualWord(target.dataset.word);
     if (action === "manual-entry-jump") jumpToManualEntry(target.dataset.word);
     if (action === "translate") translateWord(target.dataset.word);
+    if (action === "edit-chinese") startEditChinese(target.closest(".chinese-meaning"), target.dataset.word);
+    if (action === "save-chinese") saveChineseEdit(target.closest(".chinese-meaning"), target.dataset.word);
+    if (action === "cancel-edit-chinese") cancelEditChinese(target.dataset.word);
     if (action === "logout") cloud.logOut();
     if (action === "flip-card") flipCurrentFlashcard();
     if (action === "prev-card") goToFlashcard(-1);
