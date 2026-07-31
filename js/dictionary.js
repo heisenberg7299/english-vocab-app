@@ -57,16 +57,32 @@ export function phraseDeinflectionAttempts(phrase) {
   return deinflectCandidates(first).map((c) => [c, ...rest].join(" "));
 }
 
+// dictionaryapi.dev's free tier is flaky rather than actually down — spot
+// checks show ~1/3 of requests coming back 500/502 at times, but retrying
+// the exact same word moments later frequently succeeds. It's the only
+// source with phonetics, pronunciation audio, and synonyms/antonyms, so a
+// couple of quick retries on a 5xx is worth it before conceding the lookup
+// to the fallback chain (which loses that data even though it usually has
+// the definition itself).
+async function fetchWithRetry(url, retries = 2, delayMs = 400) {
+  let res;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      res = await fetch(url);
+    } catch {
+      throw new Error("網路連線失敗，請確認網路連線後再試一次");
+    }
+    if (res.status < 500 || attempt === retries) return res;
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return res;
+}
+
 export async function lookupWord(word) {
   const clean = word.trim().toLowerCase();
   if (!clean) throw new Error("請輸入單字");
 
-  let res;
-  try {
-    res = await fetch(API_BASE + encodeURIComponent(clean));
-  } catch {
-    throw new Error("網路連線失敗，請確認網路連線後再試一次");
-  }
+  const res = await fetchWithRetry(API_BASE + encodeURIComponent(clean));
 
   if (res.status === 404) {
     throw new WordNotFoundError(`找不到「${clean}」，請確認拼字是否正確`);
