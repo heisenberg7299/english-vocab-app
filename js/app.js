@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=44";
-import { generateMnemonic } from "./mnemonic.js?v=44";
-import { translateToChinese } from "./translate.js?v=44";
-import * as store from "./storage.js?v=44";
-import * as srs from "./srs.js?v=44";
-import * as quiz from "./quiz.js?v=44";
-import * as cloud from "./cloud-sync.js?v=44";
+} from "./dictionary.js?v=45";
+import { generateMnemonic } from "./mnemonic.js?v=45";
+import { translateToChinese } from "./translate.js?v=45";
+import * as store from "./storage.js?v=45";
+import * as srs from "./srs.js?v=45";
+import * as quiz from "./quiz.js?v=45";
+import * as cloud from "./cloud-sync.js?v=45";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -263,13 +263,15 @@ async function doSearch(word) {
     status.textContent = "";
     renderSearchResult(data);
   } catch (err) {
-    if (err instanceof WordNotFoundError) {
-      await handleWordNotFound(word);
-    } else {
-      lastSearchResult = null;
-      status.textContent = err.message || "查詢時發生錯誤";
-      status.classList.add("error");
-    }
+    // Whatever went wrong with the primary source — a clean "not found",
+    // or the request failing outright — always try the other sources
+    // before giving up. A generic fetch failure looks identical whether
+    // it's a real network outage or just that one specific domain being
+    // unreachable (blocked by a network/extension, having an outage,
+    // etc.) while everything else is fine; Datamuse and Wiktionary are
+    // different domains, so it's worth trying them regardless of why the
+    // primary dictionary failed, not only on a clean 404.
+    await handleWordNotFound(word);
   }
 }
 
@@ -309,7 +311,7 @@ async function lookupAllSources(word) {
 // then a de-inflected retry, and only then offer manual entry.
 async function handleWordNotFound(word) {
   const status = $("#search-status");
-  status.textContent = "主要字典查無此字，嘗試備援來源...";
+  status.textContent = "主要字典查詢失敗，嘗試備援來源...";
 
   const fallback = await lookupWordFallback(word);
   if (fallback) {
@@ -374,7 +376,7 @@ function renderNotFoundPanel(word, suggestions) {
 
   return `
     <div class="card notfound-card">
-      <p>兩個字典來源都查不到「${escapeHtml(word)}」。</p>
+      <p>所有字典來源都查不到「${escapeHtml(word)}」。</p>
       ${suggestionsHtml}
       <button class="manual-toggle-btn" data-action="manual-entry" data-word="${escapeHtml(word)}">✍️ 自行輸入意思</button>
       <div id="manual-entry-area"></div>
@@ -752,7 +754,7 @@ async function runBulkImport() {
     ${skipped.length ? `<div>⏭️ 已存在，略過 ${skipped.length} 個：${escapeHtml(skipped.join(", "))}</div>` : ""}
     ${
       failed.length
-        ? `<div class="import-fail">❌ 兩個字典來源都查不到 ${failed.length} 個：
+        ? `<div class="import-fail">❌ 所有字典來源都查不到 ${failed.length} 個：
             ${failed
               .map(
                 (w) =>
