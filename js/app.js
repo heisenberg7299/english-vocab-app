@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=47";
-import { generateMnemonic } from "./mnemonic.js?v=47";
-import { translateToChinese } from "./translate.js?v=47";
-import * as store from "./storage.js?v=47";
-import * as srs from "./srs.js?v=47";
-import * as quiz from "./quiz.js?v=47";
-import * as cloud from "./cloud-sync.js?v=47";
+} from "./dictionary.js?v=48";
+import { generateMnemonic } from "./mnemonic.js?v=48";
+import { translateToChinese } from "./translate.js?v=48";
+import * as store from "./storage.js?v=48";
+import * as srs from "./srs.js?v=48";
+import * as quiz from "./quiz.js?v=48";
+import * as cloud from "./cloud-sync.js?v=48";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -610,10 +610,17 @@ async function backfillChineseTranslations() {
   renderWordList();
 }
 
+// Remembers which word chip to scroll back to when returning to 我的單字本
+// — switching tabs collapses the list's height while its (much shorter)
+// detail card is showing, so the scroll position itself doesn't survive
+// the round trip; scrolling the specific chip back into view does.
+let lastViewedListWord = null;
+
 function viewWordDetail(word, returnTab = "list") {
   const data = store.getWord(word);
   if (!data) return;
   wordDetailReturnTab = returnTab;
+  if (returnTab === "list") lastViewedListWord = word;
   inWordDetailView = true;
   switchTab("search");
   lastSearchResult = data;
@@ -1725,7 +1732,12 @@ function initGlobalEvents() {
     if (action === "cal-prev-month") changeCalendarMonth(-1);
     if (action === "cal-next-month") changeCalendarMonth(1);
     if (action === "view-cal-day") viewCalendarDay(target.dataset.date);
-    if (action === "back-to-list") switchTab(wordDetailReturnTab);
+    if (action === "back-to-list") {
+      switchTab(wordDetailReturnTab);
+      if (wordDetailReturnTab === "list" && lastViewedListWord) {
+        $(`#word-list [data-word="${lastViewedListWord}"]`)?.scrollIntoView({ block: "center" });
+      }
+    }
     if (action === "search-word") {
       $("#search-input").value = target.dataset.word;
       doSearch(target.dataset.word);
