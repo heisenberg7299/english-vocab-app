@@ -161,27 +161,32 @@ function weightedSample(candidates, count, temperature) {
   return picked;
 }
 
+// Self-rated familiarity (紅/黃/綠, set from the word card) nudges the
+// score on top of the objective SRS priority — marking something "不熟"
+// makes it more likely to come up for review/flashcards, "熟悉" less
+// likely, since the user's own sense of a word is a signal worth
+// listening to alongside the forgetting-curve math.
+const FAMILIARITY_ADJUSTMENT = { red: 0.15, yellow: 0, green: -0.15 };
+
+// Shared by both today's-review selection and flashcard weighting, so
+// "low retention / 不熟 first" means the same thing in both places instead
+// of review using the full formula while flashcards only looked at
+// retention.
+export function adjustedPriority(card, familiarity, atDate = new Date()) {
+  return priorityScore(card, atDate) + (FAMILIARITY_ADJUSTMENT[familiarity] || 0);
+}
+
 // The actual "pick today's words" step: rank everything not in cooldown by
 // priority, take the top (limit - exploreCount), then fill the rest with a
 // priority-weighted random draw from what's left so mid-priority words
 // don't get starved forever by whatever's topping the list.
-// Self-rated familiarity (紅/黃/綠, set from the word card) nudges the
-// score on top of the objective SRS priority — marking something "不熟"
-// makes it more likely to come up for review, "熟悉" less likely, since
-// the user's own sense of a word is a signal worth listening to alongside
-// the forgetting-curve math.
-const FAMILIARITY_ADJUSTMENT = { red: 0.15, yellow: 0, green: -0.15 };
-
 export function selectDailyWords(words, limit = 15, exploreCount = 2) {
   const today = new Date();
   const candidates = words
     .filter((w) => w.srs && !cooldownActive(w.srs, today))
     .map((w) => ({
       word: w,
-      priority:
-        priorityScore(w.srs, today) +
-        (FAMILIARITY_ADJUSTMENT[w.familiarity] || 0) +
-        Math.random() * 0.001,
+      priority: adjustedPriority(w.srs, w.familiarity, today) + Math.random() * 0.001,
     }));
 
   candidates.sort((a, b) => b.priority - a.priority);

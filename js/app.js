@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=50";
-import { generateMnemonic } from "./mnemonic.js?v=50";
-import { translateToChinese } from "./translate.js?v=50";
-import * as store from "./storage.js?v=50";
-import * as srs from "./srs.js?v=50";
-import * as quiz from "./quiz.js?v=50";
-import * as cloud from "./cloud-sync.js?v=50";
+} from "./dictionary.js?v=51";
+import { generateMnemonic } from "./mnemonic.js?v=51";
+import { translateToChinese } from "./translate.js?v=51";
+import * as store from "./storage.js?v=51";
+import * as srs from "./srs.js?v=51";
+import * as quiz from "./quiz.js?v=51";
+import * as cloud from "./cloud-sync.js?v=51";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -890,7 +890,7 @@ function weeklyReviewedWords(allWords, today = new Date()) {
   });
   if (touched.length <= WEEKLY_REVIEW_CAP) return touched;
   return [...touched]
-    .sort((a, b) => srs.priorityScore(b.srs, today) - srs.priorityScore(a.srs, today))
+    .sort((a, b) => srs.adjustedPriority(b.srs, b.familiarity, today) - srs.adjustedPriority(a.srs, a.familiarity, today))
     .slice(0, WEEKLY_REVIEW_CAP);
 }
 
@@ -1314,19 +1314,21 @@ function renderFlashcards() {
 // library, uniform random draws collide on the same word way too often.
 const FLASHCARD_NO_REPEAT_WINDOW = 8;
 
-// Weighted random draw biased toward low-retention (at-risk) words,
-// rather than picking uniformly — a word about to be forgotten should
-// show up more often than one just reviewed. Words never reviewed yet
-// (no retention estimate) get a neutral mid-weight so they still surface
-// regularly without either dominating or being crowded out.
+// Weighted random draw biased toward the same "at-risk" signal used to
+// build today's review queue — low retention, high difficulty/lapses,
+// and self-rated familiarity (不熟 first) — rather than retention alone,
+// so flashcards and 今日複習 agree on what counts as "needs practice".
+// Words never reviewed yet (no retention estimate) get a neutral
+// mid-weight so they still surface regularly without either dominating
+// or being crowded out.
 function pickWeightedFlashcard(words) {
   const recentlyShown = new Set(flashcardHistory.slice(-FLASHCARD_NO_REPEAT_WINDOW));
   let pool = words.filter((w) => !recentlyShown.has(w.word));
   if (!pool.length) pool = words; // exclusion emptied the pool (tiny library) — fall back to everyone
 
   const weights = pool.map((w) => {
-    const r = srs.retention(w.srs);
-    return r === null ? 0.5 : Math.max(0.05, 1 - r);
+    if (!w.srs) return 0.5;
+    return Math.max(0.05, srs.adjustedPriority(w.srs, w.familiarity));
   });
   const total = weights.reduce((a, b) => a + b, 0);
   let roll = Math.random() * total;
