@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=49";
-import { generateMnemonic } from "./mnemonic.js?v=49";
-import { translateToChinese } from "./translate.js?v=49";
-import * as store from "./storage.js?v=49";
-import * as srs from "./srs.js?v=49";
-import * as quiz from "./quiz.js?v=49";
-import * as cloud from "./cloud-sync.js?v=49";
+} from "./dictionary.js?v=50";
+import { generateMnemonic } from "./mnemonic.js?v=50";
+import { translateToChinese } from "./translate.js?v=50";
+import * as store from "./storage.js?v=50";
+import * as srs from "./srs.js?v=50";
+import * as quiz from "./quiz.js?v=50";
+import * as cloud from "./cloud-sync.js?v=50";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -186,8 +186,8 @@ function renderWordCard(data, opts = {}) {
       ${meaningsHtml}
       ${synHtml}
       ${antHtml}
-      <div class="mnemonic-box">
-        <span class="label">💡 好背誦的方法</span>${escapeHtml(mnemonic)}
+      <div class="mnemonic-box" data-mnemonic-box>
+        <span class="label">💡 好背誦的方法${saved ? `<button type="button" class="edit-mnemonic-btn" data-action="edit-mnemonic" data-word="${escapeHtml(data.word)}" title="編輯好背的方法">✏️</button>` : ""}</span>${escapeHtml(mnemonic)}
       </div>
       ${familiarityHtml}
       ${actionsHtml}
@@ -557,6 +557,43 @@ function saveChineseEdit(container, word) {
 }
 
 function cancelEditChinese(word) {
+  const data = store.getWord(word);
+  if (!data) return;
+  refreshWordViews(word, data);
+}
+
+// Lets the user write their own memory trick instead of (or editing) the
+// auto-generated one. An empty save just falls back to the auto-generated
+// mnemonic again, since renderWordCard already does `data.mnemonic ||
+// generateMnemonic(...)` — no separate "reset" affordance needed.
+function startEditMnemonic(container, word) {
+  const data = store.getWord(word);
+  if (!data || !container) return;
+  const current = data.mnemonic || generateMnemonic(
+    data.word,
+    data.meanings[0]?.definitions[0]?.definition || ""
+  );
+  container.innerHTML = `
+    <span class="label">💡 好背誦的方法</span>
+    <textarea class="mnemonic-edit-input" rows="2">${escapeHtml(current)}</textarea>
+    <div class="mnemonic-edit-actions">
+      <button type="button" class="primary" data-action="save-mnemonic" data-word="${escapeHtml(word)}">儲存</button>
+      <button type="button" data-action="cancel-edit-mnemonic" data-word="${escapeHtml(word)}">取消</button>
+    </div>`;
+  container.querySelector(".mnemonic-edit-input")?.focus();
+}
+
+function saveMnemonicEdit(container, word) {
+  const data = store.getWord(word);
+  const textarea = container?.querySelector(".mnemonic-edit-input");
+  if (!data || !textarea) return;
+
+  const updated = { ...data, mnemonic: textarea.value.trim() };
+  store.upsertWord(updated);
+  refreshWordViews(word, updated);
+}
+
+function cancelEditMnemonic(word) {
   const data = store.getWord(word);
   if (!data) return;
   refreshWordViews(word, data);
@@ -1762,6 +1799,9 @@ function initGlobalEvents() {
     if (action === "edit-chinese") startEditChinese(target.closest(".chinese-meaning"), target.dataset.word);
     if (action === "save-chinese") saveChineseEdit(target.closest(".chinese-meaning"), target.dataset.word);
     if (action === "cancel-edit-chinese") cancelEditChinese(target.dataset.word);
+    if (action === "edit-mnemonic") startEditMnemonic(target.closest("[data-mnemonic-box]"), target.dataset.word);
+    if (action === "save-mnemonic") saveMnemonicEdit(target.closest("[data-mnemonic-box]"), target.dataset.word);
+    if (action === "cancel-edit-mnemonic") cancelEditMnemonic(target.dataset.word);
     if (action === "logout") cloud.logOut();
     if (action === "flip-card") flipCurrentFlashcard();
     if (action === "prev-card") goToFlashcard(-1);

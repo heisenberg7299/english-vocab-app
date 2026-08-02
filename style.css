@@ -401,6 +401,41 @@ button {
   line-height: 1.6;
 }
 .mnemonic-box .label { font-weight: 600; color: #92400e; display: block; margin-bottom: 4px; }
+.edit-mnemonic-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  margin-left: 4px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  opacity: 0.6;
+}
+.edit-mnemonic-btn:hover { opacity: 1; background: #fef3c7; }
+.mnemonic-edit-input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #f59e0b;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  resize: vertical;
+}
+.mnemonic-edit-actions { display: flex; gap: 8px; margin-top: 6px; }
+.mnemonic-edit-actions button {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.mnemonic-edit-actions button.primary { background: var(--primary-gradient); color: #fff; border-color: var(--primary); }
 
 .actions { margin-top: 16px; display: flex; gap: 10px; }
 .actions button {
@@ -953,6 +988,10 @@ button {
   .zh-edit-input { background: #0e1a1a; color: var(--text); border-color: var(--border); }
   .zh-edit-actions button { background: #17262a; color: var(--text); border-color: var(--border); }
   .zh-edit-actions button.primary { color: #fff; }
+  .edit-mnemonic-btn:hover { background: #3a2f0f; }
+  .mnemonic-edit-input { background: #0e1a1a; color: var(--text); border-color: #7c5a12; }
+  .mnemonic-edit-actions button { background: #17262a; color: var(--text); border-color: var(--border); }
+  .mnemonic-edit-actions button.primary { color: #fff; }
   .auth-btn { background: #17262a; color: var(--text); border-color: var(--border); }
   .auth-panel input { background: #0e1a1a; color: var(--text); border-color: var(--border); }
   .auth-actions button { background: #17262a; color: var(--text); border-color: var(--border); }
