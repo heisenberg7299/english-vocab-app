@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=48";
-import { generateMnemonic } from "./mnemonic.js?v=48";
-import { translateToChinese } from "./translate.js?v=48";
-import * as store from "./storage.js?v=48";
-import * as srs from "./srs.js?v=48";
-import * as quiz from "./quiz.js?v=48";
-import * as cloud from "./cloud-sync.js?v=48";
+} from "./dictionary.js?v=49";
+import { generateMnemonic } from "./mnemonic.js?v=49";
+import { translateToChinese } from "./translate.js?v=49";
+import * as store from "./storage.js?v=49";
+import * as srs from "./srs.js?v=49";
+import * as quiz from "./quiz.js?v=49";
+import * as cloud from "./cloud-sync.js?v=49";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -838,15 +838,23 @@ function weekStartDate(date = new Date()) {
   return d.toISOString().slice(0, 10);
 }
 
-// Every word touched at least once since Monday — the Sunday wrap-up,
-// deliberately uncapped since the point is covering the whole week.
+// Every word touched at least once since Monday — the Sunday wrap-up.
+// Capped to WEEKLY_REVIEW_CAP, favoring the ones most likely to be
+// forgotten (low retention, high difficulty, more lapses) rather than
+// dumping the whole week's words in uncapped, which got overwhelming.
+const WEEKLY_REVIEW_CAP = 40;
+
 function weeklyReviewedWords(allWords, today = new Date()) {
   const start = weekStartDate(today);
   const todayStr = today.toISOString().slice(0, 10);
-  return allWords.filter((w) => {
+  const touched = allWords.filter((w) => {
     const history = w.srs?.reviewHistory || [];
     return history.some((h) => h.date >= start && h.date <= todayStr);
   });
+  if (touched.length <= WEEKLY_REVIEW_CAP) return touched;
+  return [...touched]
+    .sort((a, b) => srs.priorityScore(b.srs, today) - srs.priorityScore(a.srs, today))
+    .slice(0, WEEKLY_REVIEW_CAP);
 }
 
 // No fixed due date anymore — every word has a priority score (forgetting
