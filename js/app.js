@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=53";
-import { generateMnemonic } from "./mnemonic.js?v=53";
-import { translateToChinese } from "./translate.js?v=53";
-import * as store from "./storage.js?v=53";
-import * as srs from "./srs.js?v=53";
-import * as quiz from "./quiz.js?v=53";
-import * as cloud from "./cloud-sync.js?v=53";
+} from "./dictionary.js?v=54";
+import { generateMnemonic } from "./mnemonic.js?v=54";
+import { translateToChinese } from "./translate.js?v=54";
+import * as store from "./storage.js?v=54";
+import * as srs from "./srs.js?v=54";
+import * as quiz from "./quiz.js?v=54";
+import * as cloud from "./cloud-sync.js?v=54";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -1910,6 +1910,28 @@ function showUpdateBanner(worker) {
   document.body.appendChild(banner);
 }
 
+// Bump alongside every ?v= cache-bust and add a plain-language one-line note
+// here — shown once, right after the update banner's reload, so "you just
+// updated" comes with a quick "here's what changed" instead of a silent
+// no-op. Only the current version's note is shown (not a running history),
+// since the goal is a quick heads-up, not a changelog archive.
+const APP_VERSION = "54";
+const CHANGELOG = {
+  54: "以後每次更新完，都會跳出這種小提示，用白話說明這次改了什麼",
+  53: "有新版本時會跳出提示，不用再自己猜要去哪裡更新",
+  52: "修正保留率：答錯會馬上降低保留率，標「不熟」也會直接讓保留率下降；字卡也不會一直重複同一個字",
+};
+const POST_UPDATE_FLAG = "vocab-app-post-update-notice";
+
+// Runs on every load; only does anything the one time it follows an
+// update-triggered reload (flag set right before that reload below).
+function checkPostUpdateNotice() {
+  if (localStorage.getItem(POST_UPDATE_FLAG) !== "1") return;
+  localStorage.removeItem(POST_UPDATE_FLAG);
+  const note = CHANGELOG[APP_VERSION];
+  if (note) showMilestoneToast(`✅ 已更新：${note}`);
+}
+
 function initServiceWorkerUpdates() {
   if (!("serviceWorker" in navigator)) return;
 
@@ -1942,6 +1964,7 @@ function initServiceWorkerUpdates() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (reloadedForUpdate) return;
       reloadedForUpdate = true;
+      localStorage.setItem(POST_UPDATE_FLAG, "1");
       window.location.reload();
     });
   });
@@ -1955,4 +1978,5 @@ initSuggest();
 initAuth();
 initGlobalEvents();
 initServiceWorkerUpdates();
+checkPostUpdateNotice();
 updateDueBadge();
