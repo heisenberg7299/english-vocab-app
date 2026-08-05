@@ -6,7 +6,14 @@ const APP_SHELL = ["./", "./index.html", "./manifest.json", "./icons/icon-192.pn
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+  // Deliberately no self.skipWaiting() here — it used to swap the active
+  // worker out from under an already-open tab with no visible signal, so an
+  // "update" silently did nothing until the page happened to reload. Now the
+  // new worker sits in "waiting" until the page's update banner asks for it.
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

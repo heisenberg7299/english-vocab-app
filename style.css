@@ -944,6 +944,36 @@ button {
 }
 .milestone-toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+.update-banner {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary-gradient);
+  color: #fff;
+  padding: 12px 14px 12px 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
+  z-index: 200;
+  max-width: min(92vw, 420px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.update-banner button {
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: none;
+  background: #fff;
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0e1a1a;

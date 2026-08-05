@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=52";
-import { generateMnemonic } from "./mnemonic.js?v=52";
-import { translateToChinese } from "./translate.js?v=52";
-import * as store from "./storage.js?v=52";
-import * as srs from "./srs.js?v=52";
-import * as quiz from "./quiz.js?v=52";
-import * as cloud from "./cloud-sync.js?v=52";
+} from "./dictionary.js?v=53";
+import { generateMnemonic } from "./mnemonic.js?v=53";
+import { translateToChinese } from "./translate.js?v=53";
+import * as store from "./storage.js?v=53";
+import * as srs from "./srs.js?v=53";
+import * as quiz from "./quiz.js?v=53";
+import * as cloud from "./cloud-sync.js?v=53";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -1893,6 +1893,60 @@ function renderAuthArea(user) {
   }
 }
 
+// ---------- Service worker update notifications ----------
+// The service worker installs a new version in the background but sits in
+// "waiting" instead of taking over immediately, precisely so this banner can
+// ask before the already-open tab gets swapped onto new code out from under
+// whatever the user's mid-way through (mirrors sw.js's install handler).
+function showUpdateBanner(worker) {
+  if (document.querySelector(".update-banner")) return;
+  const banner = document.createElement("div");
+  banner.className = "update-banner";
+  banner.innerHTML = `<span>📦 有新版本可以更新</span><button type="button">立即更新</button>`;
+  banner.querySelector("button").addEventListener("click", () => {
+    worker.postMessage("SKIP_WAITING");
+    banner.remove();
+  });
+  document.body.appendChild(banner);
+}
+
+function initServiceWorkerUpdates() {
+  if (!("serviceWorker" in navigator)) return;
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      // A worker can already be sitting in "waiting" from before this page
+      // loaded (e.g. the install finished while the tab was backgrounded).
+      if (reg.waiting) showUpdateBanner(reg.waiting);
+
+      reg.addEventListener("updatefound", () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener("statechange", () => {
+          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            showUpdateBanner(newWorker);
+          }
+        });
+      });
+
+      // Browsers only check for a new sw.js on navigation by default, so an
+      // app left open for a long session (or reopened from a homescreen icon
+      // that resumes rather than reloads) would never notice an update —
+      // also check whenever the tab comes back into view.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") reg.update();
+      });
+    });
+
+    let reloadedForUpdate = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloadedForUpdate) return;
+      reloadedForUpdate = true;
+      window.location.reload();
+    });
+  });
+}
+
 // ---------- Init ----------
 initTabs();
 initSearch();
@@ -1900,4 +1954,5 @@ initImport();
 initSuggest();
 initAuth();
 initGlobalEvents();
+initServiceWorkerUpdates();
 updateDueBadge();
