@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=51";
-import { generateMnemonic } from "./mnemonic.js?v=51";
-import { translateToChinese } from "./translate.js?v=51";
-import * as store from "./storage.js?v=51";
-import * as srs from "./srs.js?v=51";
-import * as quiz from "./quiz.js?v=51";
-import * as cloud from "./cloud-sync.js?v=51";
+} from "./dictionary.js?v=52";
+import { generateMnemonic } from "./mnemonic.js?v=52";
+import { translateToChinese } from "./translate.js?v=52";
+import * as store from "./storage.js?v=52";
+import * as srs from "./srs.js?v=52";
+import * as quiz from "./quiz.js?v=52";
+import * as cloud from "./cloud-sync.js?v=52";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -480,7 +480,7 @@ function renderWordList() {
 
   grid.innerHTML = words
     .map((w) => {
-      const retentionPct = w.srs ? Math.round(Math.max(0, Math.min(1, srs.retention(w.srs))) * 100) : null;
+      const retentionPct = w.srs ? Math.round(Math.max(0, Math.min(1, srs.effectiveRetention(w.srs, w.familiarity))) * 100) : null;
       const lowRetention = retentionPct !== null && retentionPct < 90;
       const famClass = w.familiarity ? `fam-${w.familiarity}` : "";
       const dotsHtml = FAMILIARITY_LEVELS.map(
@@ -1135,8 +1135,8 @@ function renderCurrentReviewCard() {
 // Predicted recall probability right now, per the Ebbinghaus forgetting-
 // curve formula (srs.retention) — shown during review/flashcards so the
 // schedule isn't just an opaque date, but a number grounded in the theory.
-function retentionBadge(card) {
-  const r = srs.retention(card);
+function retentionBadge(card, familiarity) {
+  const r = srs.effectiveRetention(card, familiarity);
   if (r === null) return "";
   const pct = Math.round(Math.max(0, Math.min(1, r)) * 100);
   return `<div class="retention-badge">📉 遺忘曲線預測記憶保留率：<strong>${pct}%</strong></div>`;
@@ -1152,7 +1152,7 @@ function renderQuizCard(w, allWords) {
   area.innerHTML = `
     <div class="review-card">
       <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length}</div>
-      ${retentionBadge(w.srs)}
+      ${retentionBadge(w.srs, w.familiarity)}
       ${q.sentence ? `<div class="cloze-sentence">${escapeHtml(q.sentence)}</div>` : ""}
       <div class="quiz-prompt">${escapeHtml(q.prompt)}</div>
       <div class="quiz-options ${longOptions ? "quiz-options-long" : ""}">
@@ -1251,7 +1251,7 @@ function renderFlashcardReview(w) {
     <div class="review-card">
       <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length}</div>
       <p class="status">再收藏 ${Math.max(0, 4 - store.loadWords().length)} 個單字即可解鎖選擇題複習模式</p>
-      ${retentionBadge(w.srs)}
+      ${retentionBadge(w.srs, w.familiarity)}
       <div class="review-word">${escapeHtml(w.word)}</div>
       <div class="phonetic">${escapeHtml(w.phonetic || "")}</div>
       <button class="reveal-btn" data-action="reveal">看看你記得嗎？</button>
@@ -1310,25 +1310,29 @@ function renderFlashcards() {
   }
 }
 
-// Don't hand back a word shown in the last few draws — with a small
-// library, uniform random draws collide on the same word way too often.
-const FLASHCARD_NO_REPEAT_WINDOW = 8;
+// Don't hand back a word shown recently — with a small library, uniform
+// random draws collide on the same word way too often. Scales with deck
+// size (up to 12) so a bigger library keeps a proportionally longer memory.
+function noRepeatWindow(poolSize) {
+  return Math.max(1, Math.min(12, poolSize - 1));
+}
 
 // Weighted random draw biased toward the same "at-risk" signal used to
-// build today's review queue — low retention, high difficulty/lapses,
-// and self-rated familiarity (不熟 first) — rather than retention alone,
-// so flashcards and 今日複習 agree on what counts as "needs practice".
-// Words never reviewed yet (no retention estimate) get a neutral
-// mid-weight so they still surface regularly without either dominating
-// or being crowded out.
+// build today's review queue — low retention, high difficulty/lapses, and
+// self-rated familiarity (不熟 first). The raw adjustedPriority spread can
+// be ~20x between a badly-retained word and a healthy one, which let that
+// one word keep winning the draw over and over the moment it left the
+// no-repeat window; taking sqrt() compresses that spread (~4-5x) so bad
+// words still come up clearly more often without dominating every round.
 function pickWeightedFlashcard(words) {
-  const recentlyShown = new Set(flashcardHistory.slice(-FLASHCARD_NO_REPEAT_WINDOW));
+  const window = noRepeatWindow(words.length);
+  const recentlyShown = new Set(flashcardHistory.slice(-window));
   let pool = words.filter((w) => !recentlyShown.has(w.word));
   if (!pool.length) pool = words; // exclusion emptied the pool (tiny library) — fall back to everyone
 
   const weights = pool.map((w) => {
-    if (!w.srs) return 0.5;
-    return Math.max(0.05, srs.adjustedPriority(w.srs, w.familiarity));
+    const p = w.srs ? srs.adjustedPriority(w.srs, w.familiarity) : 0.5;
+    return Math.sqrt(Math.max(0.05, p));
   });
   const total = weights.reduce((a, b) => a + b, 0);
   let roll = Math.random() * total;
@@ -1359,7 +1363,7 @@ function renderCurrentFlashcard() {
 
   area.innerHTML = `
     <div class="review-card">
-      ${retentionBadge(word.srs)}
+      ${retentionBadge(word.srs, word.familiarity)}
       <div class="review-word">${escapeHtml(word.word)}</div>
       <div class="phonetic">${escapeHtml(word.phonetic || "")}</div>
       <button class="reveal-btn" data-action="flip-card">翻面看意思</button>
@@ -1541,7 +1545,7 @@ function renderRetentionHistogram(words) {
   const labels = ["0–20%", "20–40%", "40–60%", "60–80%", "80–100%"];
   const buckets = [0, 0, 0, 0, 0];
   for (const w of words) {
-    const r = srs.retention(w.srs);
+    const r = srs.effectiveRetention(w.srs, w.familiarity);
     if (r === null) continue;
     const pct = Math.max(0, Math.min(100, r * 100));
     buckets[Math.min(4, Math.floor(pct / 20))] += 1;
@@ -1573,7 +1577,7 @@ function renderStats() {
   const todayBatch = getTodayReviewQueue(words).length;
   const streak = store.getStreak();
 
-  const retentions = words.map((w) => srs.retention(w.srs)).filter((r) => r !== null);
+  const retentions = words.map((w) => srs.effectiveRetention(w.srs, w.familiarity)).filter((r) => r !== null);
   const avgRetention = retentions.length
     ? Math.round((retentions.reduce((a, b) => a + b, 0) / retentions.length) * 100)
     : null;

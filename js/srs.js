@@ -79,6 +79,15 @@ function daysSince(card, atDate) {
   return Math.max(0, (atDate - last) / 86400000);
 }
 
+// Right after a failed ("again") review, the raw curve (t=0) reads back as
+// 100% retention — technically correct (you just saw the answer) but reads
+// as nonsense to a user who just got it wrong. Cap retention near a low
+// ceiling immediately after a lapse, relaxing back to the normal curve over
+// the same window as the "again" cooldown, so failing a word visibly drops
+// its retention instead of appearing to raise it.
+const LAPSE_RETENTION_CEILING = 0.3;
+const LAPSE_RECOVERY_DAYS = COOLDOWN_DAYS.again;
+
 // Predicted probability of recall right now. 1 = just reviewed, decays
 // toward 0 the longer it's been relative to this word's stability.
 export function retention(card, atDate = new Date()) {
@@ -86,7 +95,26 @@ export function retention(card, atDate = new Date()) {
   if (!c) return null;
   const t = daysSince(c, atDate);
   const s = Math.max(c.stability ?? 1, 0.1);
-  return Math.pow(2, -t / s);
+  let r = Math.pow(2, -t / s);
+  if (c.lastGrade === "again") {
+    const recovery = Math.min(1, t / LAPSE_RECOVERY_DAYS);
+    const ceiling = LAPSE_RETENTION_CEILING + (1 - LAPSE_RETENTION_CEILING) * recovery;
+    r = Math.min(r, ceiling);
+  }
+  return r;
+}
+
+// Self-rated familiarity (紅/黃/綠, set from the word card) nudges retention
+// on top of the objective forgetting-curve estimate — marking something
+// "不熟" should visibly lower the displayed %, not just silently change
+// selection weighting elsewhere, since a number that never moves when you
+// tell it "I don't know this" reads as broken.
+const FAMILIARITY_RETENTION_ADJUSTMENT = { red: -0.15, yellow: 0, green: 0.1 };
+
+export function effectiveRetention(card, familiarity, atDate = new Date()) {
+  const r = retention(card, atDate);
+  if (r === null) return null;
+  return Math.max(0, Math.min(1, r + (FAMILIARITY_RETENTION_ADJUSTMENT[familiarity] || 0)));
 }
 
 export function priorityScore(card, atDate = new Date()) {
@@ -161,19 +189,22 @@ function weightedSample(candidates, count, temperature) {
   return picked;
 }
 
-// Self-rated familiarity (紅/黃/綠, set from the word card) nudges the
-// score on top of the objective SRS priority — marking something "不熟"
-// makes it more likely to come up for review/flashcards, "熟悉" less
-// likely, since the user's own sense of a word is a signal worth
-// listening to alongside the forgetting-curve math.
-const FAMILIARITY_ADJUSTMENT = { red: 0.15, yellow: 0, green: -0.15 };
-
 // Shared by both today's-review selection and flashcard weighting, so
 // "low retention / 不熟 first" means the same thing in both places instead
 // of review using the full formula while flashcards only looked at
-// retention.
+// retention. Routes familiarity through the same retention term the badge
+// displays (via effectiveRetention) rather than a separate flat bonus, so
+// the number on screen and the selection weighting always agree.
 export function adjustedPriority(card, familiarity, atDate = new Date()) {
-  return priorityScore(card, atDate) + (FAMILIARITY_ADJUSTMENT[familiarity] || 0);
+  const c = normalize(card);
+  if (!c) return 0;
+  const r = effectiveRetention(card, familiarity, atDate) ?? 0;
+  return (
+    WEIGHTS.forgetting * (1 - r) +
+    WEIGHTS.difficulty * c.difficulty +
+    WEIGHTS.lapse * (c.lapses / (c.lapses + 2)) +
+    WEIGHTS.underReviewed * (1 / (c.reviews + 1))
+  );
 }
 
 // The actual "pick today's words" step: rank everything not in cooldown by
