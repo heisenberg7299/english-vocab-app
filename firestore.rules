@@ -5,5 +5,20 @@ service cloud.firestore {
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Any signed-in account can read the whole leaderboard (that's the
+    // point), but can only ever write its own entry, and only the fixed
+    // set of fields the leaderboard UI actually displays.
+    match /leaderboard/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['displayName', 'totalReviews', 'bestStreak', 'bestCombo', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 20
+        && request.resource.data.totalReviews is int
+        && request.resource.data.bestStreak is int
+        && request.resource.data.bestCombo is int;
+    }
   }
 }

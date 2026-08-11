@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=54";
-import { generateMnemonic } from "./mnemonic.js?v=54";
-import { translateToChinese } from "./translate.js?v=54";
-import * as store from "./storage.js?v=54";
-import * as srs from "./srs.js?v=54";
-import * as quiz from "./quiz.js?v=54";
-import * as cloud from "./cloud-sync.js?v=54";
+} from "./dictionary.js?v=55";
+import { generateMnemonic } from "./mnemonic.js?v=55";
+import { translateToChinese } from "./translate.js?v=55";
+import * as store from "./storage.js?v=55";
+import * as srs from "./srs.js?v=55";
+import * as quiz from "./quiz.js?v=55";
+import * as cloud from "./cloud-sync.js?v=55";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -53,6 +53,7 @@ function switchTab(name) {
   if (name === "calendar") renderCalendar();
   if (name === "stats") renderStats();
   if (name === "achievements") renderAchievements();
+  if (name === "leaderboard") renderLeaderboard();
 }
 
 // Re-renders whichever tab is currently visible — used when data changes
@@ -862,6 +863,31 @@ let reviewIndex = 0;
 let currentQuestion = null;
 let reviewStarted = false;
 
+// Consecutive-correct-answer combo, live for this page load only (resets on
+// reload rather than trying to persist mid-session state) — the record it
+// sets is what actually survives, via store.recordCombo().
+let sessionCombo = 0;
+
+function comboBadgeHtml() {
+  return sessionCombo > 1 ? `<span class="combo-badge">🔥 連擊 ${sessionCombo}</span>` : "";
+}
+
+// success = the answer counted as "recalled it" (quiz: chose the right
+// option; self-grade flashcards: anything but "忘記了"), not literally
+// "graded 5/5" — a Hard grade still keeps the combo alive since the word
+// wasn't actually forgotten.
+function updateCombo(success) {
+  if (!success) {
+    sessionCombo = 0;
+    return;
+  }
+  sessionCombo += 1;
+  const { isNewBest, bestCombo } = store.recordCombo(sessionCombo);
+  if (isNewBest && bestCombo >= 5) {
+    showMilestoneToast(`🔥 連續答對新紀錄：${bestCombo} 題！`);
+  }
+}
+
 function isSunday(date = new Date()) {
   return date.getDay() === 0;
 }
@@ -1151,7 +1177,7 @@ function renderQuizCard(w, allWords) {
 
   area.innerHTML = `
     <div class="review-card">
-      <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length}</div>
+      <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length} ${comboBadgeHtml()}</div>
       ${retentionBadge(w.srs, w.familiarity)}
       ${q.sentence ? `<div class="cloze-sentence">${escapeHtml(q.sentence)}</div>` : ""}
       <div class="quiz-prompt">${escapeHtml(q.prompt)}</div>
@@ -1221,6 +1247,7 @@ async function handleQuizAnswer(index) {
   store.upsertWord(updated);
   store.recordReviewToday();
   updateDueBadge();
+  updateCombo(correct);
   checkMilestones();
 
   const feedbackPhrase = randomFeedbackPhrase(correct);
@@ -1249,7 +1276,7 @@ function renderFlashcardReview(w) {
   const area = $("#review-area");
   area.innerHTML = `
     <div class="review-card">
-      <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length}</div>
+      <div class="review-progress">複習進度 ${reviewIndex + 1} / ${reviewQueue.length} ${comboBadgeHtml()}</div>
       <p class="status">再收藏 ${Math.max(0, 4 - store.loadWords().length)} 個單字即可解鎖選擇題複習模式</p>
       ${retentionBadge(w.srs, w.familiarity)}
       <div class="review-word">${escapeHtml(w.word)}</div>
@@ -1277,6 +1304,7 @@ function gradeCurrentWord(quality) {
   const updated = { ...w, srs: srs.review(w.srs, quality) };
   store.upsertWord(updated);
   store.recordReviewToday();
+  updateCombo(quality >= 3);
   checkMilestones();
   goToNextReviewCard();
 }
@@ -1643,6 +1671,12 @@ function markMilestoneShown(key) {
 }
 
 function showMilestoneToast(text) {
+  // Only one toast on screen at a time — a combo-record toast and a
+  // streak/word-count milestone toast can both fire from the same click,
+  // and they'd render exactly on top of each other otherwise. The skipped
+  // one isn't lost forever: checkMilestones() re-evaluates from scratch
+  // next time, and a combo record only fires again if a new one is set.
+  if (document.querySelector(".milestone-toast")) return;
   const toast = document.createElement("div");
   toast.className = "milestone-toast";
   toast.textContent = text;
@@ -1683,6 +1717,38 @@ function checkMilestones() {
 // user's already-passed milestones look locked here just because the
 // celebratory toast for them hasn't caught up yet. This page always
 // reflects the true current state.
+// Personal-best records: unlike the threshold badges below (which only ever
+// unlock, never regress), these track a number that can go up over time and
+// invite beating your own past self — separate motivation loop from
+// "reach milestone X" since there's always a next record to chase.
+function renderPersonalRecords() {
+  const words = store.loadWords();
+  const totalReviews = words.reduce((sum, w) => sum + (w.srs?.reviews || 0), 0);
+  const records = [
+    { icon: "🔥", label: "最長連續複習天數", value: store.getBestStreak(), unit: "天" },
+    { icon: "📅", label: "單日最高複習次數", value: store.getBestDailyReviews(), unit: "次" },
+    { icon: "⚡", label: "最長連續答對", value: store.getBestCombo(), unit: "題" },
+    { icon: "🎯", label: "累積複習次數", value: totalReviews, unit: "次" },
+  ];
+
+  return `
+    <div class="achv-group">
+      <h3>🏆 個人紀錄</h3>
+      <div class="records-grid">
+        ${records
+          .map(
+            (r) => `
+          <div class="record-tile">
+            <div class="record-icon">${r.icon}</div>
+            <div class="record-value">${r.value}${r.unit}</div>
+            <div class="record-label">${escapeHtml(r.label)}</div>
+          </div>`
+          )
+          .join("")}
+      </div>
+    </div>`;
+}
+
 function renderAchievements() {
   const words = store.loadWords();
   const streak = store.getStreak();
@@ -1699,6 +1765,7 @@ function renderAchievements() {
 
   $("#achievements-area").innerHTML = `
     <p class="status">已解鎖 ${unlockedCount} / ${totalCount} 個成就</p>
+    ${renderPersonalRecords()}
     ${groups
       .map(
         (g) => `
@@ -1719,6 +1786,104 @@ function renderAchievements() {
       </div>`
       )
       .join("")}`;
+}
+
+// ---------- Leaderboard ----------
+// Separate from the personal-records section above: those are "beat your
+// own past self," this is "see where you stand against everyone else" —
+// only meaningful once other accounts exist, hence gated on being logged
+// in (there's no local-only leaderboard, unlike everything else in the app).
+const DISPLAY_NAME_KEY = "vocab_display_name";
+
+function getDisplayName(user) {
+  const saved = localStorage.getItem(DISPLAY_NAME_KEY);
+  if (saved) return saved;
+  return user?.email ? user.email.split("@")[0] : "訪客";
+}
+
+// Pushes this device's current totals up to the shared leaderboard doc.
+// Debounced since it's triggered by every local write (review, combo,
+// word added) — no need to hit Firestore on each individual one.
+let leaderboardSyncTimer = null;
+function scheduleLeaderboardSync() {
+  const user = cloud.auth.currentUser;
+  if (!user) return;
+  clearTimeout(leaderboardSyncTimer);
+  leaderboardSyncTimer = setTimeout(() => {
+    const words = store.loadWords();
+    const totalReviews = words.reduce((sum, w) => sum + (w.srs?.reviews || 0), 0);
+    cloud
+      .updateLeaderboardEntry(user.uid, {
+        displayName: getDisplayName(user),
+        totalReviews,
+        bestStreak: store.getBestStreak(),
+        bestCombo: store.getBestCombo(),
+      })
+      .catch(() => {});
+  }, 2000);
+}
+
+async function renderLeaderboard() {
+  const area = $("#leaderboard-area");
+  const user = cloud.auth.currentUser;
+
+  if (!user) {
+    area.innerHTML = `
+      <div class="review-empty">
+        <div class="big">🔒</div>
+        <p>登入以同步後才能查看排行榜，也才能讓別人看到你的紀錄。</p>
+      </div>`;
+    return;
+  }
+
+  area.innerHTML = `<p class="status">載入排行榜中…</p>`;
+  scheduleLeaderboardSync();
+
+  let entries = [];
+  try {
+    entries = await cloud.fetchLeaderboard(20);
+  } catch {
+    area.innerHTML = `<p class="status error">排行榜載入失敗，稍後再試一次。</p>`;
+    return;
+  }
+
+  const myRank = entries.findIndex((e) => e.uid === user.uid);
+  const displayName = getDisplayName(user);
+
+  area.innerHTML = `
+    <div class="leaderboard-name-row">
+      <label for="leaderboard-name-input">顯示名稱</label>
+      <input id="leaderboard-name-input" type="text" maxlength="20" value="${escapeHtml(displayName)}" />
+      <button id="leaderboard-name-save" type="button">儲存</button>
+    </div>
+    <div class="leaderboard-list">
+      ${
+        entries.length
+          ? entries
+              .map(
+                (e, i) => `
+        <div class="leaderboard-row ${e.uid === user.uid ? "leaderboard-me" : ""}">
+          <span class="lb-rank">${i + 1}</span>
+          <span class="lb-name">${escapeHtml(e.displayName || "匿名")}</span>
+          <span class="lb-stat" title="累積複習次數">🎯 ${e.totalReviews || 0}</span>
+          <span class="lb-stat" title="最長連續複習天數">🔥 ${e.bestStreak || 0}</span>
+        </div>`
+              )
+              .join("")
+          : `<p class="status">還沒有排行榜資料，開始複習就會出現！</p>`
+      }
+    </div>
+    ${myRank < 0 && entries.length ? `<p class="status">你目前不在前 20 名，繼續加油！</p>` : ""}
+    <button id="leaderboard-refresh-btn" type="button" class="reveal-btn">重新整理</button>`;
+
+  $("#leaderboard-name-save").addEventListener("click", () => {
+    const val = $("#leaderboard-name-input").value.trim().slice(0, 20);
+    if (val) localStorage.setItem(DISPLAY_NAME_KEY, val);
+    else localStorage.removeItem(DISPLAY_NAME_KEY);
+    scheduleLeaderboardSync();
+    renderLeaderboard();
+  });
+  $("#leaderboard-refresh-btn").addEventListener("click", renderLeaderboard);
 }
 
 // ---------- Badge ----------
@@ -1831,6 +1996,7 @@ function initAuth() {
     renderAuthArea(user);
     if (user) {
       await cloud.startSync(user.uid);
+      scheduleLeaderboardSync();
     } else {
       cloud.stopSync();
     }
@@ -1838,6 +2004,10 @@ function initAuth() {
   });
 
   cloud.onRemoteChange(refreshCurrentTab);
+  // Keeps the shared leaderboard doc current off of every local write, not
+  // just review/combo ones — a word count milestone (via achievements) also
+  // reads off review counts, so any change to the word list matters too.
+  store.onWrite(scheduleLeaderboardSync);
 }
 
 async function submitAuth(mode) {
@@ -1915,8 +2085,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "54";
+const APP_VERSION = "55";
 const CHANGELOG = {
+  55: "新增遊戲機制：連續答對會有連擊，成就頁多了「個人紀錄」，還加了排行榜（登入後可跟其他人比）",
   54: "以後每次更新完，都會跳出這種小提示，用白話說明這次改了什麼",
   53: "有新版本時會跳出提示，不用再自己猜要去哪裡更新",
   52: "修正保留率：答錯會馬上降低保留率，標「不熟」也會直接讓保留率下降；字卡也不會一直重複同一個字",

@@ -14,12 +14,16 @@ import {
   doc,
   setDoc,
   deleteDoc,
+  getDoc,
   getDocs,
   collection,
   onSnapshot,
+  query,
+  orderBy,
+  limit as fsLimit,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js?v=54";
-import * as store from "./storage.js?v=54";
+import { firebaseConfig } from "./firebase-config.js?v=55";
+import * as store from "./storage.js?v=55";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -68,14 +72,23 @@ export async function startSync(uid) {
     localOnly.map((w) => setDoc(doc(wordsCol, w.word.toLowerCase()), w))
   );
 
-  // Merge review-streak history the same way (union of both devices' dates)
+  // Merge review-streak history the same way (union of both devices' dates).
+  // dailyCounts merges per-date by taking the max of each side (not a sum —
+  // this is a one-time reconciliation, not a running total, so summing would
+  // double-count a day already reviewed on both devices). bestCombo merges
+  // as a plain max since it's already a high-water mark.
   const cloudStatsSnap = await getDocs(collection(db, "users", uid, "meta"));
   const cloudStats = cloudStatsSnap.docs.find((d) => d.id === "stats")?.data();
   const localStats = store.loadStats();
   const mergedDates = [
     ...new Set([...(cloudStats?.reviewedDates || []), ...(localStats.reviewedDates || [])]),
   ];
-  await setDoc(statsRef, { reviewedDates: mergedDates });
+  const mergedDailyCounts = { ...(cloudStats?.dailyCounts || {}) };
+  for (const [date, count] of Object.entries(localStats.dailyCounts || {})) {
+    mergedDailyCounts[date] = Math.max(mergedDailyCounts[date] || 0, count);
+  }
+  const mergedBestCombo = Math.max(cloudStats?.bestCombo || 0, localStats.bestCombo || 0);
+  await setDoc(statsRef, { reviewedDates: mergedDates, dailyCounts: mergedDailyCounts, bestCombo: mergedBestCombo });
 
   // Live sync: any change in Firestore (from this device or another) flows
   // into the local cache and re-renders whatever's on screen.
@@ -101,7 +114,7 @@ export async function startSync(uid) {
       setDoc(doc(wordsCol, payload.word.toLowerCase()), payload).catch(() => {});
     } else if (type === "deleteWord") {
       deleteDoc(doc(wordsCol, payload.toLowerCase())).catch(() => {});
-    } else if (type === "recordReviewToday") {
+    } else if (type === "recordReviewToday" || type === "recordCombo") {
       setDoc(statsRef, payload).catch(() => {});
     }
   });
@@ -112,4 +125,25 @@ export function stopSync() {
   unsubLocalWrites?.();
   unsubWords = null;
   unsubLocalWrites = null;
+}
+
+// Separate top-level collection (not nested under users/{uid}, which only
+// the owner can ever read) — a leaderboard is inherently the one place in
+// this app where one account needs to read another account's data. Rules
+// restrict it to a fixed small field set instead of allowing arbitrary
+// writes, so a signed-in account still can't use this as a side door into
+// writing anything else.
+export function updateLeaderboardEntry(uid, data) {
+  return setDoc(doc(db, "leaderboard", uid), { ...data, updatedAt: Date.now() }, { merge: true });
+}
+
+export async function fetchLeaderboard(topN = 20) {
+  const q = query(collection(db, "leaderboard"), orderBy("totalReviews", "desc"), fsLimit(topN));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+}
+
+export async function fetchLeaderboardEntry(uid) {
+  const snap = await getDoc(doc(db, "leaderboard", uid));
+  return snap.exists() ? { uid, ...snap.data() } : null;
 }
