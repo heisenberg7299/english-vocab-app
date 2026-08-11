@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=55";
-import { generateMnemonic } from "./mnemonic.js?v=55";
-import { translateToChinese } from "./translate.js?v=55";
-import * as store from "./storage.js?v=55";
-import * as srs from "./srs.js?v=55";
-import * as quiz from "./quiz.js?v=55";
-import * as cloud from "./cloud-sync.js?v=55";
+} from "./dictionary.js?v=56";
+import { generateMnemonic } from "./mnemonic.js?v=56";
+import { translateToChinese } from "./translate.js?v=56";
+import * as store from "./storage.js?v=56";
+import * as srs from "./srs.js?v=56";
+import * as quiz from "./quiz.js?v=56";
+import * as cloud from "./cloud-sync.js?v=56";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -83,6 +83,20 @@ function escapeHtml(str = "") {
   return str.replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+// The mnemonic box renders with white-space: pre-line so every newline in
+// the text becomes a real line break — but that also means a stray leading
+// space on any line (easy to pick up while typing/pasting into the edit
+// textarea) renders as a visible indent on just that line, throwing off
+// alignment with the box's padding. .trim() on the whole string only
+// catches the very first/last line, so this trims each line individually.
+function normalizeMultilineText(str = "") {
+  return str
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .trim();
 }
 
 // Nothing in the lookup/save/quiz pipeline actually requires a single
@@ -188,7 +202,7 @@ function renderWordCard(data, opts = {}) {
       ${synHtml}
       ${antHtml}
       <div class="mnemonic-box" data-mnemonic-box>
-        <span class="label">💡 好背誦的方法${saved ? `<button type="button" class="edit-mnemonic-btn" data-action="edit-mnemonic" data-word="${escapeHtml(data.word)}" title="編輯好背的方法">✏️</button>` : ""}</span>${escapeHtml(mnemonic)}
+        <span class="label">💡 好背誦的方法${saved ? `<button type="button" class="edit-mnemonic-btn" data-action="edit-mnemonic" data-word="${escapeHtml(data.word)}" title="編輯好背的方法">✏️</button>` : ""}</span>${escapeHtml(normalizeMultilineText(mnemonic))}
       </div>
       ${familiarityHtml}
       ${actionsHtml}
@@ -589,7 +603,7 @@ function saveMnemonicEdit(container, word) {
   const textarea = container?.querySelector(".mnemonic-edit-input");
   if (!data || !textarea) return;
 
-  const updated = { ...data, mnemonic: textarea.value.trim() };
+  const updated = { ...data, mnemonic: normalizeMultilineText(textarea.value) };
   store.upsertWord(updated);
   refreshWordViews(word, updated);
 }
@@ -2085,8 +2099,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "55";
+const APP_VERSION = "56";
 const CHANGELOG = {
+  56: "修正好背誦的方法框框裡文字沒對齊的問題",
   55: "新增遊戲機制：連續答對會有連擊，成就頁多了「個人紀錄」，還加了排行榜（登入後可跟其他人比）",
   54: "以後每次更新完，都會跳出這種小提示，用白話說明這次改了什麼",
   53: "有新版本時會跳出提示，不用再自己猜要去哪裡更新",
