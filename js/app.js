@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=56";
-import { generateMnemonic } from "./mnemonic.js?v=56";
-import { translateToChinese } from "./translate.js?v=56";
-import * as store from "./storage.js?v=56";
-import * as srs from "./srs.js?v=56";
-import * as quiz from "./quiz.js?v=56";
-import * as cloud from "./cloud-sync.js?v=56";
+} from "./dictionary.js?v=57";
+import { generateMnemonic } from "./mnemonic.js?v=57";
+import { translateToChinese } from "./translate.js?v=57";
+import * as store from "./storage.js?v=57";
+import * as srs from "./srs.js?v=57";
+import * as quiz from "./quiz.js?v=57";
+import * as cloud from "./cloud-sync.js?v=57";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -201,9 +201,7 @@ function renderWordCard(data, opts = {}) {
       ${meaningsHtml}
       ${synHtml}
       ${antHtml}
-      <div class="mnemonic-box" data-mnemonic-box>
-        <span class="label">💡 好背誦的方法${saved ? `<button type="button" class="edit-mnemonic-btn" data-action="edit-mnemonic" data-word="${escapeHtml(data.word)}" title="編輯好背的方法">✏️</button>` : ""}</span>${escapeHtml(normalizeMultilineText(mnemonic))}
-      </div>
+      <div class="mnemonic-box" data-mnemonic-box><span class="label">💡 好背誦的方法${saved ? `<button type="button" class="edit-mnemonic-btn" data-action="edit-mnemonic" data-word="${escapeHtml(data.word)}" title="編輯好背的方法">✏️</button>` : ""}</span>${escapeHtml(normalizeMultilineText(mnemonic))}</div>
       ${familiarityHtml}
       ${actionsHtml}
     </div>`;
@@ -588,13 +586,7 @@ function startEditMnemonic(container, word) {
     data.word,
     data.meanings[0]?.definitions[0]?.definition || ""
   );
-  container.innerHTML = `
-    <span class="label">💡 好背誦的方法</span>
-    <textarea class="mnemonic-edit-input" rows="2">${escapeHtml(current)}</textarea>
-    <div class="mnemonic-edit-actions">
-      <button type="button" class="primary" data-action="save-mnemonic" data-word="${escapeHtml(word)}">儲存</button>
-      <button type="button" data-action="cancel-edit-mnemonic" data-word="${escapeHtml(word)}">取消</button>
-    </div>`;
+  container.innerHTML = `<span class="label">💡 好背誦的方法</span><textarea class="mnemonic-edit-input" rows="2">${escapeHtml(current)}</textarea><div class="mnemonic-edit-actions"><button type="button" class="primary" data-action="save-mnemonic" data-word="${escapeHtml(word)}">儲存</button><button type="button" data-action="cancel-edit-mnemonic" data-word="${escapeHtml(word)}">取消</button></div>`;
   container.querySelector(".mnemonic-edit-input")?.focus();
 }
 
@@ -2099,8 +2091,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "56";
+const APP_VERSION = "57";
 const CHANGELOG = {
+  57: "修正好背誦的方法框框裡，標題跟內文之間多一行空白的問題",
   56: "修正好背誦的方法框框裡文字沒對齊的問題",
   55: "新增遊戲機制：連續答對會有連擊，成就頁多了「個人紀錄」，還加了排行榜（登入後可跟其他人比）",
   54: "以後每次更新完，都會跳出這種小提示，用白話說明這次改了什麼",

@@ -22,8 +22,8 @@ import {
   orderBy,
   limit as fsLimit,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js?v=56";
-import * as store from "./storage.js?v=56";
+import { firebaseConfig } from "./firebase-config.js?v=57";
+import * as store from "./storage.js?v=57";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
