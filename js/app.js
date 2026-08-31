@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=58";
-import { generateMnemonic } from "./mnemonic.js?v=58";
-import { translateToChinese } from "./translate.js?v=58";
-import * as store from "./storage.js?v=58";
-import * as srs from "./srs.js?v=58";
-import * as quiz from "./quiz.js?v=58";
-import * as cloud from "./cloud-sync.js?v=58";
+} from "./dictionary.js?v=59";
+import { generateMnemonic } from "./mnemonic.js?v=59";
+import { translateToChinese } from "./translate.js?v=59";
+import * as store from "./storage.js?v=59";
+import * as srs from "./srs.js?v=59";
+import * as quiz from "./quiz.js?v=59";
+import * as cloud from "./cloud-sync.js?v=59";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -2095,8 +2095,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "58";
+const APP_VERSION = "59";
 const CHANGELOG = {
+  59: "字典來源回應太慢時，現在最多等 6 秒就會自動改用備援來源，不會卡很久",
   58: "加速「加入單字本」：不用再重新查一次字典和翻譯了",
   57: "修正好背誦的方法框框裡，標題跟內文之間多一行空白的問題",
   56: "修正好背誦的方法框框裡文字沒對齊的問題",

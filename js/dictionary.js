@@ -64,13 +64,28 @@ export function phraseDeinflectionAttempts(phrase) {
 // couple of quick retries on a 5xx is worth it before conceding the lookup
 // to the fallback chain (which loses that data even though it usually has
 // the definition itself).
-async function fetchWithRetry(url, retries = 2, delayMs = 400) {
+//
+// It also, at times, goes fully unreachable behind Cloudflare (HTTP 522)
+// instead of erroring quickly — Cloudflare waits a full ~20s per request
+// before giving up. Without a client-side timeout, retrying that 2-3 times
+// stacks up to a full minute of waiting before this even falls through to
+// Datamuse/Wiktionary. Capping each attempt at 6s means a dead origin is
+// abandoned in well under that.
+async function fetchWithRetry(url, retries = 1, delayMs = 300, timeoutMs = 6000) {
   let res;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      res = await fetch(url);
-    } catch {
-      throw new Error("網路連線失敗，請確認網路連線後再試一次");
+      res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    } catch (err) {
+      if (attempt === retries) {
+        throw new Error(
+          err?.name === "TimeoutError" || err?.name === "AbortError"
+            ? "字典來源目前回應太慢，請稍後再試"
+            : "網路連線失敗，請確認網路連線後再試一次"
+        );
+      }
+      await new Promise((r) => setTimeout(r, delayMs));
+      continue;
     }
     if (res.status < 500 || attempt === retries) return res;
     await new Promise((r) => setTimeout(r, delayMs));
