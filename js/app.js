@@ -7,13 +7,13 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=57";
-import { generateMnemonic } from "./mnemonic.js?v=57";
-import { translateToChinese } from "./translate.js?v=57";
-import * as store from "./storage.js?v=57";
-import * as srs from "./srs.js?v=57";
-import * as quiz from "./quiz.js?v=57";
-import * as cloud from "./cloud-sync.js?v=57";
+} from "./dictionary.js?v=58";
+import { generateMnemonic } from "./mnemonic.js?v=58";
+import { translateToChinese } from "./translate.js?v=58";
+import * as store from "./storage.js?v=58";
+import * as srs from "./srs.js?v=58";
+import * as quiz from "./quiz.js?v=58";
+import * as cloud from "./cloud-sync.js?v=58";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -472,11 +472,15 @@ function addWordToList(wordKey) {
     : null;
   if (!data) return;
 
-  saveWordRecord(data);
+  // Reuse the data already fetched by the search that's on screen instead
+  // of calling doSearch() again — that would re-hit the dictionary API and
+  // re-run the Chinese translation from scratch just to redraw a card we
+  // already have all the data for.
+  const full = saveWordRecord(data);
   updateDueBadge();
   checkMilestones();
-  // refresh whichever card is currently displayed
-  doSearch(data.word);
+  lastSearchResult = full;
+  renderSearchResult(full);
 }
 
 // ---------- Word list tab ----------
@@ -2091,8 +2095,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "57";
+const APP_VERSION = "58";
 const CHANGELOG = {
+  58: "加速「加入單字本」：不用再重新查一次字典和翻譯了",
   57: "修正好背誦的方法框框裡，標題跟內文之間多一行空白的問題",
   56: "修正好背誦的方法框框裡文字沒對齊的問題",
   55: "新增遊戲機制：連續答對會有連擊，成就頁多了「個人紀錄」，還加了排行榜（登入後可跟其他人比）",
