@@ -6,13 +6,14 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=61";
-import { generateMnemonic } from "./mnemonic.js?v=61";
-import { translateToChinese } from "./translate.js?v=61";
-import * as store from "./storage.js?v=61";
-import * as srs from "./srs.js?v=61";
-import * as quiz from "./quiz.js?v=61";
-import * as cloud from "./cloud-sync.js?v=61";
+} from "./dictionary.js?v=62";
+import { generateMnemonic } from "./mnemonic.js?v=62";
+import { HANDWRITTEN_MNEMONIC_NOTES } from "./mnemonic-notes.js?v=62";
+import { translateToChinese } from "./translate.js?v=62";
+import * as store from "./storage.js?v=62";
+import * as srs from "./srs.js?v=62";
+import * as quiz from "./quiz.js?v=62";
+import * as cloud from "./cloud-sync.js?v=62";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -2067,8 +2068,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "61";
+const APP_VERSION = "62";
 const CHANGELOG = {
+  62: "把你手寫的記憶法筆記加進單字本裡已存的單字（只更新這次有筆記的那些字）",
   61: "原本的主要字典來源太不穩定，已經整個換掉，查單字改用另一個更快的來源",
   60: "查單字改成兩個字典來源同時查、誰先回來就用誰，不用再乾等主要字典",
   59: "字典來源回應太慢時，現在最多等 6 秒就會自動改用備援來源，不會卡很久",
@@ -2089,6 +2091,31 @@ function checkPostUpdateNotice() {
   localStorage.removeItem(POST_UPDATE_FLAG);
   const note = CHANGELOG[APP_VERSION];
   if (note) showMilestoneToast(`✅ 已更新：${note}`);
+}
+
+// One-time import of the user's own handwritten mnemonic notes (see
+// mnemonic-notes.js) into whichever of those words are already in their
+// word list — replaces each matching word's mnemonic outright, since
+// these are the actual memory hooks the user wrote for themselves, not
+// just supplementary hints. Flag-gated so it only ever runs once per
+// device; a word added after this runs, or one not in the notes, is
+// untouched.
+const MNEMONIC_NOTES_FLAG = "vocab-app-mnemonic-notes-v1-applied";
+function applyHandwrittenMnemonicNotes() {
+  if (localStorage.getItem(MNEMONIC_NOTES_FLAG) === "1") return;
+  localStorage.setItem(MNEMONIC_NOTES_FLAG, "1");
+
+  let updatedCount = 0;
+  for (const w of store.loadWords()) {
+    const note = HANDWRITTEN_MNEMONIC_NOTES[w.word.toLowerCase()];
+    if (!note) continue;
+    store.upsertWord({ word: w.word, mnemonic: note });
+    updatedCount++;
+  }
+  if (updatedCount > 0) {
+    showMilestoneToast(`📝 已幫 ${updatedCount} 個單字加上你的手寫記憶法`);
+    refreshCurrentTab();
+  }
 }
 
 function initServiceWorkerUpdates() {
@@ -2138,4 +2165,5 @@ initAuth();
 initGlobalEvents();
 initServiceWorkerUpdates();
 checkPostUpdateNotice();
+applyHandwrittenMnemonicNotes();
 updateDueBadge();
