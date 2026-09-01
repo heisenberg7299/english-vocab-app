@@ -1,11 +1,10 @@
-// Fetches and normalizes word data from the Free Dictionary API
-// (https://dictionaryapi.dev). No API key required, CORS-enabled.
-const API_BASE = "https://api.dictionaryapi.dev/api/v2/entries/en/";
-
-// Datamuse (https://www.datamuse.com/api/) is used as a fallback when a word
-// isn't in the Free Dictionary API: its md=d flag returns Wiktionary
-// definitions for words that API doesn't have, and its sp= (spelled like)
-// param finds similarly-spelled words for a "did you mean" suggestion list.
+// Datamuse (https://www.datamuse.com/api/) is the primary dictionary
+// source: its md=d flag returns Wiktionary definitions, and its sp=
+// (spelled like) param finds similarly-spelled words for a "did you mean"
+// suggestion list. dictionaryapi.dev used to be tried first (it had
+// phonetics/audio/synonyms Datamuse lacks) but was dropped — it's been
+// answering in 20s+ or timing out outright, which made every search slow
+// or stuck regardless of retry/race logic on this end.
 const DATAMUSE_BASE = "https://api.datamuse.com/words";
 
 const DATAMUSE_POS = {
@@ -57,110 +56,10 @@ export function phraseDeinflectionAttempts(phrase) {
   return deinflectCandidates(first).map((c) => [c, ...rest].join(" "));
 }
 
-// dictionaryapi.dev's free tier is flaky rather than actually down — spot
-// checks show ~1/3 of requests coming back 500/502 at times, but retrying
-// the exact same word moments later frequently succeeds. It's the only
-// source with phonetics, pronunciation audio, and synonyms/antonyms, so a
-// couple of quick retries on a 5xx is worth it before conceding the lookup
-// to the fallback chain (which loses that data even though it usually has
-// the definition itself).
-//
-// It also, at times, goes fully unreachable behind Cloudflare (HTTP 522)
-// instead of erroring quickly — Cloudflare waits a full ~20s per request
-// before giving up. Without a client-side timeout, retrying that 2-3 times
-// stacks up to a full minute of waiting before this even falls through to
-// Datamuse/Wiktionary. Capping each attempt at 6s means a dead origin is
-// abandoned in well under that.
-async function fetchWithRetry(url, retries = 1, delayMs = 300, timeoutMs = 6000) {
-  let res;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-    } catch (err) {
-      if (attempt === retries) {
-        throw new Error(
-          err?.name === "TimeoutError" || err?.name === "AbortError"
-            ? "字典來源目前回應太慢，請稍後再試"
-            : "網路連線失敗，請確認網路連線後再試一次"
-        );
-      }
-      await new Promise((r) => setTimeout(r, delayMs));
-      continue;
-    }
-    if (res.status < 500 || attempt === retries) return res;
-    await new Promise((r) => setTimeout(r, delayMs));
-  }
-  return res;
-}
-
-export async function lookupWord(word) {
-  const clean = word.trim().toLowerCase();
-  if (!clean) throw new Error("請輸入單字");
-
-  const res = await fetchWithRetry(API_BASE + encodeURIComponent(clean));
-
-  if (res.status === 404) {
-    throw new WordNotFoundError(`找不到「${clean}」，請確認拼字是否正確`);
-  }
-  if (!res.ok) {
-    throw new Error(`查詢失敗（HTTP ${res.status}）`);
-  }
-
-  const data = await res.json();
-  return normalize(clean, data);
-}
-
-function normalize(word, entries) {
-  const phonetic =
-    entries.find((e) => e.phonetic)?.phonetic ||
-    entries.flatMap((e) => e.phonetics || []).find((p) => p.text)?.text ||
-    "";
-
-  const audio = entries
-    .flatMap((e) => e.phonetics || [])
-    .find((p) => p.audio)?.audio;
-
-  const meanings = [];
-  const allSynonyms = new Set();
-  const allAntonyms = new Set();
-
-  for (const entry of entries) {
-    for (const meaning of entry.meanings || []) {
-      const definitions = (meaning.definitions || []).slice(0, 3).map((d) => ({
-        definition: d.definition,
-        example: d.example || "",
-        synonyms: d.synonyms || [],
-        antonyms: d.antonyms || [],
-      }));
-
-      for (const d of definitions) {
-        d.synonyms.forEach((s) => allSynonyms.add(s));
-        d.antonyms.forEach((a) => allAntonyms.add(a));
-      }
-      (meaning.synonyms || []).forEach((s) => allSynonyms.add(s));
-      (meaning.antonyms || []).forEach((a) => allAntonyms.add(a));
-
-      meanings.push({
-        partOfSpeech: meaning.partOfSpeech,
-        definitions,
-      });
-    }
-  }
-
-  return {
-    word,
-    phonetic,
-    audio: audio || "",
-    meanings,
-    synonyms: [...allSynonyms].slice(0, 10),
-    antonyms: [...allAntonyms].slice(0, 10),
-  };
-}
-
-// Fallback for words the Free Dictionary API doesn't have. Returns null
-// (rather than throwing) when Datamuse has no exact-spelling definition
-// either, so callers can fall through to suggestions / manual entry.
-export async function lookupWordFallback(word) {
+// Primary dictionary source. Returns null (rather than throwing) when
+// Datamuse has no exact-spelling definition, so callers can fall through
+// to Wiktionary / suggestions / manual entry.
+export async function lookupWordDatamuse(word) {
   const clean = word.trim().toLowerCase();
   let entries;
   try {
@@ -207,35 +106,12 @@ export async function lookupWordFallback(word) {
   };
 }
 
-// Races the primary dictionary against Datamuse instead of always waiting
-// for the primary to finish first. The primary is richer (phonetics,
-// audio, example sentences, synonyms/antonyms) and normally answers in
-// well under a second, so it naturally wins whenever it's healthy — but
-// this stops a search from ever waiting out its multi-second retry/timeout
-// budget when Datamuse already has a perfectly good answer.
-export async function lookupWordFast(word) {
-  const primary = lookupWord(word).then(
-    (data) => ({ ok: true, data }),
-    (err) => ({ ok: false, err })
-  );
-  const fallback = lookupWordFallback(word).then((data) => ({ ok: !!data, data }));
-
-  const first = await Promise.race([primary, fallback]);
-  if (first.ok) return first.data;
-
-  const [primaryResult, fallbackResult] = await Promise.all([primary, fallback]);
-  if (primaryResult.ok) return primaryResult.data;
-  if (fallbackResult.ok) return fallbackResult.data;
-  throw primaryResult.err;
-}
-
-// Third fallback, tried after both the primary dictionary and Datamuse
-// come up empty: Wiktionary itself, via MediaWiki's API (CORS-enabled
-// through origin=*). The response is rendered HTML, not structured JSON
-// like the other two sources, so this parses it with DOMParser — and
-// noticeably widens phrase/idiom coverage beyond Datamuse's own (older,
-// partial) Wiktionary snapshot; confirmed "rally behind" only shows up
-// through this path, not the other two.
+// Fallback, tried when Datamuse comes up empty: Wiktionary itself, via
+// MediaWiki's API (CORS-enabled through origin=*). The response is
+// rendered HTML, not structured JSON like Datamuse, so this parses it
+// with DOMParser — and noticeably widens phrase/idiom coverage beyond
+// Datamuse's own (older, partial) Wiktionary snapshot; confirmed "rally
+// behind" only shows up through this path, not Datamuse's.
 const WIKTIONARY_BASE = "https://en.wiktionary.org/w/api.php";
 const WIKTIONARY_POS = new Set([
   "noun", "verb", "adjective", "adverb", "pronoun", "preposition",

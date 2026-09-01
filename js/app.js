@@ -1,18 +1,18 @@
 import {
-  lookupWordFast,
+  lookupWordDatamuse,
   lookupWordWiktionary,
   fetchSimilarWords,
   fetchRelatedWords,
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=60";
-import { generateMnemonic } from "./mnemonic.js?v=60";
-import { translateToChinese } from "./translate.js?v=60";
-import * as store from "./storage.js?v=60";
-import * as srs from "./srs.js?v=60";
-import * as quiz from "./quiz.js?v=60";
-import * as cloud from "./cloud-sync.js?v=60";
+} from "./dictionary.js?v=61";
+import { generateMnemonic } from "./mnemonic.js?v=61";
+import { translateToChinese } from "./translate.js?v=61";
+import * as store from "./storage.js?v=61";
+import * as srs from "./srs.js?v=61";
+import * as quiz from "./quiz.js?v=61";
+import * as cloud from "./cloud-sync.js?v=61";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -302,16 +302,11 @@ function renderSearchResult(data) {
   $("#search-result").innerHTML = backHtml + renderWordCard(data, { saved });
 }
 
-// Tries all three dictionary sources for one query string — primary and
-// Datamuse raced against each other (see lookupWordFast), then Wiktionary
-// if neither of those has it — and throws if none of them do.
+// Tries both dictionary sources for one query string — Datamuse first,
+// then Wiktionary if that has nothing — and throws if neither does.
 async function lookupAllSources(word) {
-  try {
-    return await lookupWordFast(word);
-  } catch {
-    // whatever failed (not-found, timeout, network) — Wiktionary is a
-    // different domain, worth trying regardless of why the others failed
-  }
+  const fromDatamuse = await lookupWordDatamuse(word);
+  if (fromDatamuse) return fromDatamuse;
   const wiktionary = await lookupWordWiktionary(word);
   if (wiktionary) return wiktionary;
   throw new WordNotFoundError(`找不到「${word.trim().toLowerCase()}」`);
@@ -2072,8 +2067,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "60";
+const APP_VERSION = "61";
 const CHANGELOG = {
+  61: "原本的主要字典來源太不穩定，已經整個換掉，查單字改用另一個更快的來源",
   60: "查單字改成兩個字典來源同時查、誰先回來就用誰，不用再乾等主要字典",
   59: "字典來源回應太慢時，現在最多等 6 秒就會自動改用備援來源，不會卡很久",
   58: "加速「加入單字本」：不用再重新查一次字典和翻譯了",
