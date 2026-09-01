@@ -207,6 +207,28 @@ export async function lookupWordFallback(word) {
   };
 }
 
+// Races the primary dictionary against Datamuse instead of always waiting
+// for the primary to finish first. The primary is richer (phonetics,
+// audio, example sentences, synonyms/antonyms) and normally answers in
+// well under a second, so it naturally wins whenever it's healthy — but
+// this stops a search from ever waiting out its multi-second retry/timeout
+// budget when Datamuse already has a perfectly good answer.
+export async function lookupWordFast(word) {
+  const primary = lookupWord(word).then(
+    (data) => ({ ok: true, data }),
+    (err) => ({ ok: false, err })
+  );
+  const fallback = lookupWordFallback(word).then((data) => ({ ok: !!data, data }));
+
+  const first = await Promise.race([primary, fallback]);
+  if (first.ok) return first.data;
+
+  const [primaryResult, fallbackResult] = await Promise.all([primary, fallback]);
+  if (primaryResult.ok) return primaryResult.data;
+  if (fallbackResult.ok) return fallbackResult.data;
+  throw primaryResult.err;
+}
+
 // Third fallback, tried after both the primary dictionary and Datamuse
 // come up empty: Wiktionary itself, via MediaWiki's API (CORS-enabled
 // through origin=*). The response is rendered HTML, not structured JSON

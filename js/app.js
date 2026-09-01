@@ -1,19 +1,18 @@
 import {
-  lookupWord,
-  lookupWordFallback,
+  lookupWordFast,
   lookupWordWiktionary,
   fetchSimilarWords,
   fetchRelatedWords,
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=59";
-import { generateMnemonic } from "./mnemonic.js?v=59";
-import { translateToChinese } from "./translate.js?v=59";
-import * as store from "./storage.js?v=59";
-import * as srs from "./srs.js?v=59";
-import * as quiz from "./quiz.js?v=59";
-import * as cloud from "./cloud-sync.js?v=59";
+} from "./dictionary.js?v=60";
+import { generateMnemonic } from "./mnemonic.js?v=60";
+import { translateToChinese } from "./translate.js?v=60";
+import * as store from "./storage.js?v=60";
+import * as srs from "./srs.js?v=60";
+import * as quiz from "./quiz.js?v=60";
+import * as cloud from "./cloud-sync.js?v=60";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -274,19 +273,13 @@ async function doSearch(word) {
   inWordDetailView = false; // a fresh search always leaves detail-view mode
 
   try {
-    const data = await attachChineseMeaning(await lookupWord(word));
+    const data = await attachChineseMeaning(await lookupAllSources(word));
     lastSearchResult = data;
     status.textContent = "";
     renderSearchResult(data);
   } catch (err) {
-    // Whatever went wrong with the primary source — a clean "not found",
-    // or the request failing outright — always try the other sources
-    // before giving up. A generic fetch failure looks identical whether
-    // it's a real network outage or just that one specific domain being
-    // unreachable (blocked by a network/extension, having an outage,
-    // etc.) while everything else is fine; Datamuse and Wiktionary are
-    // different domains, so it's worth trying them regardless of why the
-    // primary dictionary failed, not only on a clean 404.
+    // Whatever went wrong — a clean "not found" from every source, or a
+    // request failing outright — try a de-inflected retry before giving up.
     await handleWordNotFound(word);
   }
 }
@@ -309,43 +302,27 @@ function renderSearchResult(data) {
   $("#search-result").innerHTML = backHtml + renderWordCard(data, { saved });
 }
 
-// Tries all three dictionary sources in order for one query string;
-// returns the raw (not-yet-translated) word data, or null if none have it.
+// Tries all three dictionary sources for one query string — primary and
+// Datamuse raced against each other (see lookupWordFast), then Wiktionary
+// if neither of those has it — and throws if none of them do.
 async function lookupAllSources(word) {
   try {
-    return await lookupWord(word);
-  } catch (err) {
-    if (!(err instanceof WordNotFoundError)) throw err;
+    return await lookupWordFast(word);
+  } catch {
+    // whatever failed (not-found, timeout, network) — Wiktionary is a
+    // different domain, worth trying regardless of why the others failed
   }
-  const fromDatamuse = await lookupWordFallback(word);
-  if (fromDatamuse) return fromDatamuse;
-  return await lookupWordWiktionary(word);
+  const wiktionary = await lookupWordWiktionary(word);
+  if (wiktionary) return wiktionary;
+  throw new WordNotFoundError(`找不到「${word.trim().toLowerCase()}」`);
 }
 
-// Primary dictionary has nothing: try Datamuse, then Wiktionary directly
-// (broader phrase coverage than Datamuse's own older Wiktionary snapshot),
-// then a de-inflected retry, and only then offer manual entry.
+// Every dictionary source came up empty for the word as typed — try a
+// de-inflected retry (for phrases whose first word is conjugated), and
+// only then offer manual entry.
 async function handleWordNotFound(word) {
   const status = $("#search-status");
-  status.textContent = "主要字典查詢失敗，嘗試備援來源...";
-
-  const fallback = await lookupWordFallback(word);
-  if (fallback) {
-    const withZh = await attachChineseMeaning(fallback);
-    lastSearchResult = withZh;
-    status.textContent = "";
-    renderSearchResult(withZh);
-    return;
-  }
-
-  const wiktionary = await lookupWordWiktionary(word);
-  if (wiktionary) {
-    const withZh = await attachChineseMeaning(wiktionary);
-    lastSearchResult = withZh;
-    status.textContent = "";
-    renderSearchResult(withZh);
-    return;
-  }
+  status.textContent = "查詢中，嘗試其他寫法...";
 
   // Dictionaries only store phrases in their base form ("beat around the
   // bush"), so a conjugated phrase ("beating around the bush") fails an
@@ -2095,8 +2072,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "59";
+const APP_VERSION = "60";
 const CHANGELOG = {
+  60: "查單字改成兩個字典來源同時查、誰先回來就用誰，不用再乾等主要字典",
   59: "字典來源回應太慢時，現在最多等 6 秒就會自動改用備援來源，不會卡很久",
   58: "加速「加入單字本」：不用再重新查一次字典和翻譯了",
   57: "修正好背誦的方法框框裡，標題跟內文之間多一行空白的問題",
