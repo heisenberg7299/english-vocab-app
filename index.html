@@ -4,11 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>單字背起來 · 英文單字學習</title>
-<link rel="stylesheet" href="style.css?v=63" />
-<link rel="manifest" href="manifest.json?v=63" />
+<link rel="stylesheet" href="style.css?v=64" />
+<link rel="manifest" href="manifest.json?v=64" />
 <meta name="theme-color" content="#2f7a86" />
-<link rel="icon" href="icons/icon-192.png?v=63" />
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=63" />
+<link rel="icon" href="icons/icon-192.png?v=64" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=64" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="單字背起來" />
@@ -52,6 +52,7 @@
       <button class="tab-btn" data-tab="stats">統計</button>
       <button class="tab-btn" data-tab="achievements">成就</button>
       <button class="tab-btn" data-tab="leaderboard">排行榜</button>
+      <button class="tab-btn" data-tab="roots">字根字首</button>
     </nav>
   </header>
 
@@ -135,9 +136,17 @@
     <section id="tab-leaderboard" class="tab-panel">
       <div id="leaderboard-area"></div>
     </section>
+
+    <!-- 字根字首 -->
+    <section id="tab-roots" class="tab-panel">
+      <div class="list-toolbar">
+        <input id="roots-filter" type="text" placeholder="搜尋字首、字根、意思或範例單字..." />
+      </div>
+      <div id="roots-area"></div>
+    </section>
   </main>
 </div>
 
-<script type="module" src="js/app.js?v=63"></script>
+<script type="module" src="js/app.js?v=64"></script>
 </body>
 </html>

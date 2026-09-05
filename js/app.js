@@ -6,14 +6,15 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=63";
-import { generateMnemonic, buildGreRootHintLines } from "./mnemonic.js?v=63";
-import { HANDWRITTEN_MNEMONIC_NOTES } from "./mnemonic-notes.js?v=63";
-import { translateToChinese } from "./translate.js?v=63";
-import * as store from "./storage.js?v=63";
-import * as srs from "./srs.js?v=63";
-import * as quiz from "./quiz.js?v=63";
-import * as cloud from "./cloud-sync.js?v=63";
+} from "./dictionary.js?v=64";
+import { generateMnemonic, buildGreRootHintLines } from "./mnemonic.js?v=64";
+import { HANDWRITTEN_MNEMONIC_NOTES } from "./mnemonic-notes.js?v=64";
+import { GRE_PREFIXES, GRE_ROOTS } from "./gre-roots.js?v=64";
+import { translateToChinese } from "./translate.js?v=64";
+import * as store from "./storage.js?v=64";
+import * as srs from "./srs.js?v=64";
+import * as quiz from "./quiz.js?v=64";
+import * as cloud from "./cloud-sync.js?v=64";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -54,6 +55,7 @@ function switchTab(name) {
   if (name === "stats") renderStats();
   if (name === "achievements") renderAchievements();
   if (name === "leaderboard") renderLeaderboard();
+  if (name === "roots") renderRoots();
 }
 
 // Re-renders whichever tab is currently visible — used when data changes
@@ -2068,8 +2070,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "63";
+const APP_VERSION = "64";
 const CHANGELOG = {
+  64: "漢堡選單新增「字根字首」頁，可以隨時瀏覽 30 個字首、90 個字根加深印象",
   63: "好背誦的方法現在會自動偵測 GRE 課本裡的字首/字根，符合的字（新舊都算）會自動多一行提示",
   62: "把你手寫的記憶法筆記加進單字本裡已存的單字（只更新這次有筆記的那些字）",
   61: "原本的主要字典來源太不穩定，已經整個換掉，查單字改用另一個更快的來源",
@@ -2139,6 +2142,58 @@ function applyGreRootHints() {
   if (updatedCount > 0) refreshCurrentTab();
 }
 
+// ---------- 字根字首 reference tab ----------
+// Static reference browser over the same gre-roots.js data that powers the
+// mnemonic auto-hints — lets the user flip through prefixes/roots directly
+// instead of only meeting them indirectly on whichever word card happens
+// to contain one.
+function initRoots() {
+  $("#roots-filter").addEventListener("input", renderRoots);
+}
+
+function matchesRootsFilter(entry, q) {
+  if (!q) return true;
+  const haystack = [...entry.forms, entry.meaning, entry.hint || "", ...entry.examples]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+function renderRootCard(entry, { isPrefix }) {
+  const forms = entry.forms.map((f) => escapeHtml(isPrefix ? `${f}-` : f)).join("、");
+  return `
+    <div class="root-card">
+      <div class="root-forms">${forms}</div>
+      <div class="root-meaning">${escapeHtml(entry.meaning)}</div>
+      ${entry.hint ? `<div class="root-hint">提示字：${escapeHtml(entry.hint)}</div>` : ""}
+      <div class="root-examples">${entry.examples.map(escapeHtml).join("、")}</div>
+    </div>`;
+}
+
+function renderRoots() {
+  const area = $("#roots-area");
+  if (!area) return;
+  const q = ($("#roots-filter").value || "").trim().toLowerCase();
+
+  const prefixes = GRE_PREFIXES.filter((e) => matchesRootsFilter(e, q));
+  const roots = GRE_ROOTS.filter((e) => matchesRootsFilter(e, q));
+
+  area.innerHTML = `
+    <p class="import-hint">GRE 課程整理的常見字首、字根，附提示字和範例單字，平時可以隨手翻一翻加深印象。</p>
+    <div class="achv-group">
+      <h3>字首 Prefixes</h3>
+      <div class="roots-grid">
+        ${prefixes.map((e) => renderRootCard(e, { isPrefix: true })).join("") || `<p class="empty-hint">沒有符合的字首</p>`}
+      </div>
+    </div>
+    <div class="achv-group">
+      <h3>字根 Roots</h3>
+      <div class="roots-grid">
+        ${roots.map((e) => renderRootCard(e, { isPrefix: false })).join("") || `<p class="empty-hint">沒有符合的字根</p>`}
+      </div>
+    </div>`;
+}
+
 function initServiceWorkerUpdates() {
   if (!("serviceWorker" in navigator)) return;
 
@@ -2182,6 +2237,7 @@ initTabs();
 initSearch();
 initImport();
 initSuggest();
+initRoots();
 initAuth();
 initGlobalEvents();
 initServiceWorkerUpdates();
