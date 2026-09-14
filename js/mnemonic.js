@@ -2,7 +2,7 @@
 // mnemonics, so this builds one from common English prefixes/roots/suffixes
 // plus a naive syllable split, giving the learner building blocks to make
 // their own memory hook instead of a canned AI-generated sentence.
-import { GRE_PREFIXES, GRE_ROOTS } from "./gre-roots.js?v=64";
+import { GRE_PREFIXES, GRE_ROOTS } from "./gre-roots.js?v=65";
 
 const PREFIXES = [
   ["un", "不、相反"], ["re", "再次、往回"], ["dis", "不、相反、分開"],

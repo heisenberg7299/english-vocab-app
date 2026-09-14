@@ -6,15 +6,16 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=64";
-import { generateMnemonic, buildGreRootHintLines } from "./mnemonic.js?v=64";
-import { HANDWRITTEN_MNEMONIC_NOTES } from "./mnemonic-notes.js?v=64";
-import { GRE_PREFIXES, GRE_ROOTS } from "./gre-roots.js?v=64";
-import { translateToChinese } from "./translate.js?v=64";
-import * as store from "./storage.js?v=64";
-import * as srs from "./srs.js?v=64";
-import * as quiz from "./quiz.js?v=64";
-import * as cloud from "./cloud-sync.js?v=64";
+} from "./dictionary.js?v=65";
+import { generateMnemonic, buildGreRootHintLines } from "./mnemonic.js?v=65";
+import { HANDWRITTEN_MNEMONIC_NOTES } from "./mnemonic-notes.js?v=65";
+import { GRE_PREFIXES, GRE_ROOTS } from "./gre-roots.js?v=65";
+import { BOOK_VOCAB } from "./gre-book-vocab.js?v=65";
+import { translateToChinese } from "./translate.js?v=65";
+import * as store from "./storage.js?v=65";
+import * as srs from "./srs.js?v=65";
+import * as quiz from "./quiz.js?v=65";
+import * as cloud from "./cloud-sync.js?v=65";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -2070,8 +2071,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "64";
+const APP_VERSION = "65";
 const CHANGELOG = {
+  65: "把課本裡你還沒收藏的單字自動加進單字本，每個字都附背法（可以用「補上缺少的中文」按鈕再補中文翻譯）",
   64: "漢堡選單新增「字根字首」頁，可以隨時瀏覽 30 個字首、90 個字根加深印象",
   63: "好背誦的方法現在會自動偵測 GRE 課本裡的字首/字根，符合的字（新舊都算）會自動多一行提示",
   62: "把你手寫的記憶法筆記加進單字本裡已存的單字（只更新這次有筆記的那些字）",
@@ -2140,6 +2142,70 @@ function applyGreRootHints() {
     updatedCount++;
   }
   if (updatedCount > 0) refreshCurrentTab();
+}
+
+// Builds the mnemonic for a brand-new word imported from BOOK_VOCAB. If the
+// user already has their own handwritten note for this exact word (see
+// mnemonic-notes.js — a richer, more personal memory hook than anything
+// this pass can derive), that takes priority as the main line, same as it
+// would have if the word had already existed when
+// applyHandwrittenMnemonicNotes() ran; otherwise falls back to which 意群
+// cluster it belongs to plus any near-synonyms the book gave it. Either
+// way, also includes any margin note transcribed from the book itself
+// (chapter 3 only) and whatever GRE root/prefix hint applies — the same
+// ingredients applyGreRootHints() would add later, assembled up front so a
+// fresh import doesn't need a second pass to catch up.
+function buildMnemonicFromBookEntry(entry) {
+  const lines = [];
+  const ownNote = HANDWRITTEN_MNEMONIC_NOTES[entry.word.toLowerCase()];
+  if (ownNote) {
+    lines.push(ownNote);
+  } else {
+    const allSynonyms = [...new Set(entry.definitions.flatMap((d) => d.synonyms || []))];
+    lines.push(`屬於「${entry.clusterLabel}」意群${allSynonyms.length ? `；近義：${allSynonyms.join("、")}` : ""}`);
+  }
+  if (entry.handwrittenNote) lines.push(`📝 ${entry.handwrittenNote}`);
+  lines.push(...buildGreRootHintLines(entry.word));
+  return lines.join("\n");
+}
+
+// One-time-per-word import of the user's GRE course-book vocabulary (see
+// gre-book-vocab.js) — adds only whichever of these words aren't already
+// in the word list; never touches or overwrites a word that's already
+// there, even if this book has richer data for it (that's what
+// applyHandwrittenMnemonicNotes()/applyGreRootHints() are for). Not flag
+// -gated like those two, since the per-word store.getWord() check already
+// makes it naturally idempotent across every load.
+function importBookVocabulary() {
+  let addedCount = 0;
+  for (const entry of BOOK_VOCAB) {
+    if (store.getWord(entry.word)) continue;
+    const full = {
+      word: entry.word,
+      phonetic: entry.phonetic || "",
+      audio: "",
+      meanings: [{
+        partOfSpeech: "",
+        definitions: entry.definitions.map((d) => ({
+          definition: d.definition,
+          example: d.example || "",
+          synonyms: d.synonyms || [],
+          antonyms: [],
+        })),
+      }],
+      synonyms: [...new Set(entry.definitions.flatMap((d) => d.synonyms || []))].slice(0, 10),
+      antonyms: [],
+      mnemonic: buildMnemonicFromBookEntry(entry),
+      addedDate: new Date().toISOString().slice(0, 10),
+      srs: srs.newCard(),
+    };
+    store.upsertWord(full);
+    addedCount++;
+  }
+  if (addedCount > 0) {
+    showMilestoneToast(`📚 已幫你加入 ${addedCount} 個課本裡還沒收藏的單字`);
+    refreshCurrentTab();
+  }
 }
 
 // ---------- 字根字首 reference tab ----------
@@ -2244,4 +2310,5 @@ initServiceWorkerUpdates();
 checkPostUpdateNotice();
 applyHandwrittenMnemonicNotes();
 applyGreRootHints();
+importBookVocabulary();
 updateDueBadge();
