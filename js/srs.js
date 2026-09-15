@@ -10,6 +10,12 @@
 const WEIGHTS = { forgetting: 0.65, difficulty: 0.2, lapse: 0.1, underReviewed: 0.05 };
 const COOLDOWN_DAYS = { again: 1, hard: 1, good: 1, easy: 3 };
 const EXPLORE_TEMPERATURE = 0.15;
+// A round is built as repeating [EXPLORE_CYCLE_SIZE explore words, then
+// REVIEW_CYCLE_SIZE of the highest-priority "at risk" words] cycles, so a
+// session reads as "mostly discovery, circle back to a weak word every so
+// often" instead of front-loading every at-risk word into one block.
+const EXPLORE_CYCLE_SIZE = 5;
+const REVIEW_CYCLE_SIZE = 1;
 
 export function newCard() {
   // t_i starts at 1 (not 0) for a fresh word per design: gives it a
@@ -208,19 +214,19 @@ export function adjustedPriority(card, familiarity, atDate = new Date()) {
 }
 
 // The actual "pick today's words" step: rank everything not in cooldown by
-// priority, take the top (limit - exploreCount), then fill the rest with a
-// priority-weighted random draw from what's left so mid-priority words
-// don't get starved forever by whatever's topping the list.
-//
-// exploreCount defaults to ~40% of limit rather than a flat number: a flat
-// count (this used to be a hardcoded 2) works fine while the library is
-// small, but once it's grown into the hundreds, a persistent handful of
-// consistently-hard words can fill nearly every exploit slot every single
-// day (verified: 13/15 slots in a 200-word simulation), leaving only 2
-// slots ever touching the other 90%+ of the library — which reads as "today
-// looks just like yesterday" even though most of the library is being
-// starved, not actually being reviewed efficiently.
-export function selectDailyWords(words, limit = 15, exploreCount = Math.max(2, Math.round(limit * 0.4))) {
+// priority. The very top slice (by EXPLORE_CYCLE_SIZE:REVIEW_CYCLE_SIZE)
+// is the "review" pool — the most at-risk words; everything else is the
+// "explore" pool, drawn via priority-weighted random sampling so
+// mid-priority words aren't starved forever by whatever's lowest. The
+// output interleaves them as repeating [explore x5, review x1] cycles
+// instead of grouping every at-risk word up front, so a session reads as
+// mostly discovery with an occasional circle-back to a weak word, rather
+// than "here's your pile of weak words, then a couple of random ones" —
+// with a big library, that front-loaded shape meant the same handful of
+// consistently-hard words filled nearly every top slot every single day
+// (verified: 13/15 slots in a 200-word simulation), which read as "today
+// looks just like yesterday."
+export function selectDailyWords(words, limit = 15) {
   const today = new Date();
   const candidates = words
     .filter((w) => w.srs && !cooldownActive(w.srs, today))
@@ -231,10 +237,26 @@ export function selectDailyWords(words, limit = 15, exploreCount = Math.max(2, M
 
   candidates.sort((a, b) => b.priority - a.priority);
 
-  const exploitCount = Math.max(0, limit - exploreCount);
-  const top = candidates.slice(0, exploitCount);
-  const rest = candidates.slice(exploitCount);
-  const explored = weightedSample(rest, Math.min(exploreCount, rest.length, Math.max(0, limit - top.length)), EXPLORE_TEMPERATURE);
+  const cycleSize = EXPLORE_CYCLE_SIZE + REVIEW_CYCLE_SIZE;
+  const reviewPoolSize = Math.min(candidates.length, Math.ceil((limit * REVIEW_CYCLE_SIZE) / cycleSize));
+  const reviewPool = candidates.slice(0, reviewPoolSize);
+  const explorePool = weightedSample(
+    candidates.slice(reviewPoolSize),
+    Math.max(0, limit - reviewPoolSize),
+    EXPLORE_TEMPERATURE
+  );
 
-  return [...top, ...explored].map((c) => c.word);
+  const result = [];
+  let ei = 0;
+  let ri = 0;
+  while (result.length < limit && (ei < explorePool.length || ri < reviewPool.length)) {
+    for (let i = 0; i < EXPLORE_CYCLE_SIZE && ei < explorePool.length && result.length < limit; i++) {
+      result.push(explorePool[ei++]);
+    }
+    for (let i = 0; i < REVIEW_CYCLE_SIZE && ri < reviewPool.length && result.length < limit; i++) {
+      result.push(reviewPool[ri++]);
+    }
+  }
+
+  return result.map((c) => c.word);
 }
