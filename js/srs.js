@@ -211,7 +211,16 @@ export function adjustedPriority(card, familiarity, atDate = new Date()) {
 // priority, take the top (limit - exploreCount), then fill the rest with a
 // priority-weighted random draw from what's left so mid-priority words
 // don't get starved forever by whatever's topping the list.
-export function selectDailyWords(words, limit = 15, exploreCount = 2) {
+//
+// exploreCount defaults to ~40% of limit rather than a flat number: a flat
+// count (this used to be a hardcoded 2) works fine while the library is
+// small, but once it's grown into the hundreds, a persistent handful of
+// consistently-hard words can fill nearly every exploit slot every single
+// day (verified: 13/15 slots in a 200-word simulation), leaving only 2
+// slots ever touching the other 90%+ of the library — which reads as "today
+// looks just like yesterday" even though most of the library is being
+// starved, not actually being reviewed efficiently.
+export function selectDailyWords(words, limit = 15, exploreCount = Math.max(2, Math.round(limit * 0.4))) {
   const today = new Date();
   const candidates = words
     .filter((w) => w.srs && !cooldownActive(w.srs, today))
