@@ -1,4 +1,6 @@
 :root {
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang TC", "Microsoft JhengHei", sans-serif;
   --bg: #f6f9f8;
   --dot-color: rgba(15, 23, 42, 0.05);
   --blob-1: rgba(69, 184, 164, 0.35);
@@ -10,7 +12,8 @@
   --muted: #6b7280;
   --primary: #2f7a86;
   --primary-dark: #1f5760;
-  --primary-gradient: linear-gradient(135deg, #4fa3ae, #2f7a86);
+  --primary-gradient: linear-gradient(135deg, #5fc9bd, #2f7a86 55%, #1b4c54);
+  --warm-gradient: linear-gradient(135deg, #f97316, #ef4444);
   --accent: #0d9488;
   --accent2: #3f8fa0;
   --accent3: #1a4a54;
@@ -19,8 +22,11 @@
   --danger: #dc2626;
   --border: #e5e7eb;
   --radius: 14px;
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.09);
+  /* Layered (tight contact shadow + soft diffuse glow) rather than a
+     single flat blur — reads as actual elevation instead of a smudge. */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 3px 8px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 2px 6px rgba(15, 23, 42, 0.06), 0 14px 32px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 8px 18px rgba(15, 23, 42, 0.10), 0 28px 56px rgba(15, 23, 42, 0.18);
 
   /* per-section identity colors, all drawn from the app icon's teal/slate/mint palette */
   --sec-search: var(--primary);
@@ -35,8 +41,7 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
-    "Microsoft JhengHei", sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg);
   background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
   background-size: 24px 24px;
@@ -104,6 +109,8 @@ button {
 .topbar h1 {
   margin: 0;
   font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   background: var(--primary-gradient);
   -webkit-background-clip: text;
   background-clip: text;
@@ -201,13 +208,18 @@ button {
   border-radius: 999px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
   color: var(--muted);
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .tab-btn:hover { background: #e5f3f2; transform: translateY(-1px); }
-.tab-btn.active { background: var(--primary-gradient); color: #fff; box-shadow: 0 3px 10px rgba(47, 122, 134, 0.35); }
+.tab-btn.active {
+  background: var(--primary-gradient);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(47, 122, 134, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
 
 .badge {
   background: var(--danger);
@@ -234,18 +246,27 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 16px;
+  background: var(--card-bg);
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.search-form input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(47, 122, 134, 0.14);
 }
 .search-form button {
-  padding: 12px 20px;
+  padding: 12px 22px;
   border: none;
   border-radius: var(--radius);
   background: var(--primary-gradient);
   color: #fff;
   font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 3px 10px rgba(47, 122, 134, 0.25);
+  box-shadow: 0 3px 10px rgba(47, 122, 134, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
-.search-form button:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(47, 122, 134, 0.35); }
+.search-form button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(47, 122, 134, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22); }
 
 .status { min-height: 20px; color: var(--muted); margin-bottom: 8px; font-size: 14px; }
 .status.error { color: var(--danger); }
@@ -264,8 +285,9 @@ button {
 .card {
   background: var(--card-bg);
   border-radius: var(--radius);
-  padding: 18px 20px;
-  box-shadow: var(--shadow-sm);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(15, 23, 42, 0.04);
   margin-bottom: 14px;
   border-top: 3px solid var(--sec-search);
   animation: fadeIn 0.25s ease;
@@ -274,7 +296,7 @@ button {
 #tab-flashcards .card { border-top-color: var(--sec-flashcards); }
 
 .word-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.word-head h2 { margin: 0; font-size: 26px; }
+.word-head h2 { margin: 0; font-size: 27px; font-weight: 800; letter-spacing: -0.01em; }
 .phonetic { color: var(--muted); font-size: 15px; }
 .audio-btn {
   border: none; background: none; cursor: pointer; font-size: 18px;
@@ -566,7 +588,7 @@ button {
   transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
 .word-chip:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--sec-list); }
-.word-chip h3 { margin: 0 0 4px; font-size: 17px; padding-right: 60px; }
+.word-chip h3 { margin: 0 0 4px; font-size: 17px; font-weight: 700; padding-right: 60px; }
 .chip-zh { font-size: 13px; color: var(--text); margin-bottom: 4px; }
 .word-chip .meta { font-size: 12px; color: var(--muted); }
 .word-chip .due-today { color: var(--primary); font-weight: 600; }
@@ -957,11 +979,15 @@ button {
   text-align: center;
   box-shadow: var(--shadow-sm);
   border: 2px solid transparent;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.achv-badge.achv-unlocked { border-color: var(--accent); }
-.achv-badge.achv-locked { opacity: 0.45; }
+.achv-badge.achv-unlocked {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm), 0 0 0 3px rgba(13, 148, 136, 0.08);
+}
+.achv-badge.achv-locked { opacity: 0.55; border-style: dashed; border-color: var(--border); filter: grayscale(0.5); }
 .achv-badge:hover { transform: translateY(-2px); }
+.achv-badge.achv-unlocked:hover { box-shadow: var(--shadow-md), 0 0 0 3px rgba(13, 148, 136, 0.12); }
 .achv-icon { font-size: 26px; margin-bottom: 6px; }
 .achv-num { font-size: 12px; font-weight: 600; color: var(--muted); }
 .achv-badge.achv-unlocked .achv-num { color: var(--accent); }
@@ -1072,8 +1098,9 @@ button {
     --accent2: #6fb8c4;
     --accent3: #4fae9c;
     --accent5: #45c2d6;
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25), 0 3px 8px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.25), 0 14px 32px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 18px rgba(0, 0, 0, 0.3), 0 28px 56px rgba(0, 0, 0, 0.45);
   }
   .tag { background: #1f3336; }
   .tag.syn { background: #14351f; color: #86efac; }

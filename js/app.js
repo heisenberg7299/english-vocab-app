@@ -6,16 +6,16 @@ import {
   buildManualWordData,
   phraseDeinflectionAttempts,
   WordNotFoundError,
-} from "./dictionary.js?v=67";
-import { generateMnemonic, buildGreRootHintLines } from "./mnemonic.js?v=67";
-import { HANDWRITTEN_MNEMONIC_NOTES } from "./mnemonic-notes.js?v=67";
-import { GRE_PREFIXES, GRE_ROOTS } from "./gre-roots.js?v=67";
-import { BOOK_VOCAB } from "./gre-book-vocab.js?v=67";
-import { translateToChinese } from "./translate.js?v=67";
-import * as store from "./storage.js?v=67";
-import * as srs from "./srs.js?v=67";
-import * as quiz from "./quiz.js?v=67";
-import * as cloud from "./cloud-sync.js?v=67";
+} from "./dictionary.js?v=68";
+import { generateMnemonic, buildGreRootHintLines } from "./mnemonic.js?v=68";
+import { HANDWRITTEN_MNEMONIC_NOTES } from "./mnemonic-notes.js?v=68";
+import { GRE_PREFIXES, GRE_ROOTS } from "./gre-roots.js?v=68";
+import { BOOK_VOCAB } from "./gre-book-vocab.js?v=68";
+import { translateToChinese } from "./translate.js?v=68";
+import * as store from "./storage.js?v=68";
+import * as srs from "./srs.js?v=68";
+import * as quiz from "./quiz.js?v=68";
+import * as cloud from "./cloud-sync.js?v=68";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -2071,8 +2071,9 @@ function showUpdateBanner(worker) {
 // updated" comes with a quick "here's what changed" instead of a silent
 // no-op. Only the current version's note is shown (not a running history),
 // since the goal is a quick heads-up, not a changelog archive.
-const APP_VERSION = "67";
+const APP_VERSION = "68";
 const CHANGELOG = {
+  68: "整體視覺升級：換了新字體、卡片陰影更有層次、成就徽章鎖定/解鎖更好分辨",
   67: "今日複習改成固定節奏：探索 5 個字、複習 1 個熟悉度低的字，重複這個循環，不再一次塞一大堆複習字",
   66: "修正今日複習每天都很像的問題：以前只有 2 個名額給新字/其他字，現在提高到約 6 個，複習會更多樣",
   65: "把課本裡你還沒收藏的單字自動加進單字本，每個字都附背法（可以用「補上缺少的中文」按鈕再補中文翻譯）",
